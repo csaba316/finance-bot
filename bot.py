@@ -11,24 +11,24 @@ ZAPIER_WEBHOOK_URL = os.getenv("ZAPIER_WEBHOOK_URL")
 
 def calculate_rsi(data, window=14):
     """Calculate RSI using 10-minute closing prices."""
-    delta = data['Close'].diff()  # Get price difference between periods
+    delta = data['Close'].diff()
 
     # Separate gains and losses
-    gain = delta.where(delta > 0, 0)  
-    loss = -delta.where(delta < 0, 0)  
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
 
-    # Calculate rolling averages for gains and losses
-    avg_gain = gain.rolling(window=window, min_periods=window).mean()
-    avg_loss = loss.rolling(window=window, min_periods=window).mean()
+    # Fix: Ensure rolling calculations start earlier
+    avg_gain = gain.rolling(window=window, min_periods=1).mean()
+    avg_loss = loss.rolling(window=window, min_periods=1).mean()
 
     # Calculate RSI
     rs = avg_gain / (avg_loss + 1e-10)  # Prevent division by zero
     rsi = 100 - (100 / (1 + rs))
-    
-     # **Fix RSI NaN values by backfilling**
-    rsi.fillna(method="bfill", inplace=True)  # Backfill missing RSI values
-    rsi.fillna(50, inplace=True)  # Set any remaining NaNs to 50 (neutral RSI)
-    
+
+    # Fix: Ensure NaN values are handled correctly
+    rsi = rsi.fillna(method="ffill")  # Forward-fill missing values
+    rsi = rsi.fillna(50)  # Set any remaining NaNs to 50 (neutral RSI)
+
     return rsi
 
     
