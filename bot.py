@@ -60,11 +60,15 @@ def fetch_stock_data():
         # Calculate RSI
         stock['RSI'] = calculate_rsi(stock)
 
+        # Fix remaining NaN values in RSI
+        stock['RSI'].fillna(method="bfill", inplace=True)  # Backfill to remove first NaNs
+        stock['RSI'].fillna(50, inplace=True)  # Default to 50 if still NaN (neutral RSI)
+
         # Debugging Step: Check if RSI column is NaN after calculation
         print("📈 Checking NaN values after RSI calculation:")
-        print(stock[['RSI']].isna().sum())  # If this is 0, RSI is working
+        print(stock[['RSI']].isna().sum())  # Should return 0
 
-        # Only compute SMA if we have enough data points
+        # Compute SMA
         stock['SMA_50'] = stock['Close'].rolling(window=50, min_periods=50).mean()
         stock['SMA_200'] = stock['Close'].rolling(window=200, min_periods=200).mean()
 
@@ -75,6 +79,7 @@ def fetch_stock_data():
     except Exception as e:
         print(f"❌ Error fetching stock data: {e}")
         return None
+
         
 def calculate_indicators(stock):
     """ Calculate RSI, SMA, MACD, Bollinger Bands, and ATR """
