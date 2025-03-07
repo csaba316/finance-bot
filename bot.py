@@ -12,12 +12,14 @@ ZAPIER_WEBHOOK_URL = os.getenv("ZAPIER_WEBHOOK_URL")
 def calculate_rsi(data, window=14):
     """Calculate RSI using 10-minute closing prices."""
     delta = data['Close'].diff()
+    
+    print("🔍 Debugging Price Differences (Delta):")
+    print(delta.tail(20))  # Print last 20 deltas
 
     # Separate gains and losses
     gain = delta.where(delta > 0, 0)
     loss = -delta.where(delta < 0, 0)
 
-    # Fix: Ensure rolling calculations start earlier
     avg_gain = gain.rolling(window=window, min_periods=1).mean()
     avg_loss = loss.rolling(window=window, min_periods=1).mean()
 
@@ -25,8 +27,8 @@ def calculate_rsi(data, window=14):
     rs = avg_gain / (avg_loss + 1e-10)  # Prevent division by zero
     rsi = 100 - (100 / (1 + rs))
 
-    # Fix: Ensure NaN values are handled correctly
-    rsi = rsi.fillna(method="ffill")  # Forward-fill missing values
+    # Ensure NaN values are handled correctly
+    rsi = rsi.fillna(method="bfill")  # Backfill missing values
     rsi = rsi.fillna(50)  # Set any remaining NaNs to 50 (neutral RSI)
 
     return rsi
@@ -190,6 +192,10 @@ def main():
                 # Debug SMA_200 Calculation
                 print("🔍 Debugging SMA_200 Calculation:")
                 print(stock_data[['Close', 'SMA_200']].tail(20))  # Last 20 SMA_200 values
+
+                print("🔍 Debugging Gain and Loss:")
+                print(gain.tail(20))
+                print(loss.tail(20))
                 
                 # Get the latest row including RSI correctly
                 latest_data = stock_data.iloc[[-1]].copy()  # Extract the last row as a DataFrame
