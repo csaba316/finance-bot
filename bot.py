@@ -11,17 +11,30 @@ ZAPIER_WEBHOOK_URL = os.getenv("ZAPIER_WEBHOOK_URL")
 def fetch_stock_data():
     """ Fetch NVIDIA stock data and resample to 10-minute intervals """
     try:
-        stock = yf.download("NVDA", period="5d", interval="1m")  # Increase data range
+        stock = yf.download("NVDA", period="5d", interval="1m")
 
         if stock.empty:
             raise ValueError("❌ Yahoo Finance returned an empty dataset. Try increasing the period or changing the interval.")
 
-        stock = stock.resample('10min').agg({'Open':'first', 'High':'max', 'Low':'min', 'Close':'last', 'Volume':'sum'})
+        stock = stock.reset_index()  # Fix multi-index issue
+        print("✅ Fetched Columns:", stock.columns)  # Debugging
+
+        # Ensure correct columns exist
+        expected_columns = {'Open', 'High', 'Low', 'Close', 'Volume'}
+        missing_columns = expected_columns - set(stock.columns)
+        if missing_columns:
+            raise ValueError(f"❌ Missing columns in data: {missing_columns}")
+
+        stock = stock[['Open', 'High', 'Low', 'Close', 'Volume']]
+        stock = stock.resample('10min', on='Datetime').agg({
+            'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
+        })
 
         return stock
     except Exception as e:
         print(f"❌ Error fetching stock data: {e}")
         return None
+
 
 def calculate_indicators(stock):
     """ Calculate RSI, SMA, MACD, Bollinger Bands, and ATR """
