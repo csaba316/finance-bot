@@ -200,15 +200,6 @@ def main():
                 # Debug SMA_200 Calculation
                 print("🔍 Debugging SMA_200 Calculation:")
                 print(stock_data[['Close', 'SMA_200']].tail(20))  # Last 20 SMA_200 values
-
-                print("🔍 Debugging Gain and Loss:")
-                print(gain.tail(20))
-                print(loss.tail(20))
-
-                print("🔍 Debugging Average Gains & Losses:")
-                print(avg_gain.tail(20))
-                print(avg_loss.tail(20))
-
                 
                 # Get the latest row including RSI correctly
                 latest_data = stock_data.iloc[[-1]].copy()  # Extract the last row as a DataFrame
