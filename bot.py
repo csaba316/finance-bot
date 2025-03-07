@@ -158,6 +158,8 @@ def send_to_zapier(data):
     except Exception as e:
         print(f"❌ Error sending data to Zapier: {e}")
 
+import time
+
 def main():
     """ Main loop to run every 10 minutes """
     while True:
@@ -170,7 +172,7 @@ def main():
             if stock_data is not None and not stock_data.empty:  # Re-check after indicators
                 # Get the latest data row safely
                 latest_data = stock_data.iloc[-1].copy()
-                latest_data['RSI'] = stock_data['RSI'].iloc[-1]  # Ensure RSI is included
+                latest_data.at['RSI'] = stock_data['RSI'].iloc[-1]  # Ensure RSI is included
 
                 print("📈 Latest Stock Data:")
                 print(latest_data)
@@ -183,6 +185,10 @@ def main():
 
         print("⏳ Waiting 10 minutes for next check...\n")
         time.sleep(600)  # Wait 10 minutes before the next check
+
+if __name__ == "__main__":
+    main()
+
 
 if __name__ == "__main__":
     main()
