@@ -23,7 +23,7 @@ def calculate_rsi(data, window=14):
     return rsi
     
 def fetch_stock_data():
-    """ Fetch NVIDIA stock data, resample to 10-minute intervals, and calculate RSI """
+    """ Fetch NVIDIA stock data, resample to 10-minute intervals, and calculate indicators with NaN fixes """
     try:
         stock = yf.download("NVDA", period="5d", interval="1m", group_by="ticker")
 
@@ -48,14 +48,20 @@ def fetch_stock_data():
         # Drop NaN values after resampling
         stock = stock.dropna()
 
-        # Calculate RSI
+        # Calculate Indicators
         stock['RSI'] = calculate_rsi(stock)
+        stock['SMA_50'] = stock['Close'].rolling(window=50).mean()
+        stock['SMA_200'] = stock['Close'].rolling(window=200).mean()
+
+        # Handle NaN values
+        stock.fillna(method="ffill", inplace=True)  # Forward-fill missing values
+        stock.fillna(method="bfill", inplace=True)  # Backfill as a backup
 
         return stock
     except Exception as e:
         print(f"❌ Error fetching stock data: {e}")
         return None
-
+        
 def calculate_indicators(stock):
     """ Calculate RSI, SMA, MACD, Bollinger Bands, and ATR """
     try:
