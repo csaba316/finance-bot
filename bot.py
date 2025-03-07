@@ -8,8 +8,22 @@ import numpy as np
 # Replace with your Zapier Webhook URL
 ZAPIER_WEBHOOK_URL = os.getenv("ZAPIER_WEBHOOK_URL")
 
+def calculate_rsi(data, window=14):
+    """Calculate RSI using 10-minute closing prices."""
+    delta = data['Close'].diff(1)
+    gain = np.where(delta > 0, delta, 0)
+    loss = np.where(delta < 0, -delta, 0)
+
+    avg_gain = pd.Series(gain).rolling(window=window, min_periods=1).mean()
+    avg_loss = pd.Series(loss).rolling(window=window, min_periods=1).mean()
+
+    rs = avg_gain / (avg_loss + 1e-10)  # Avoid division by zero
+    rsi = 100 - (100 / (1 + rs))
+
+    return rsi
+    
 def fetch_stock_data():
-    """ Fetch NVIDIA stock data and resample to 10-minute intervals """
+    """ Fetch NVIDIA stock data, resample to 10-minute intervals, and calculate RSI """
     try:
         stock = yf.download("NVDA", period="5d", interval="1m", group_by="ticker")
 
@@ -30,6 +44,12 @@ def fetch_stock_data():
 
         # Resample to 10-minute intervals
         stock = stock.resample('10min').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'})
+
+        # Drop NaN values after resampling
+        stock = stock.dropna()
+
+        # Calculate RSI
+        stock['RSI'] = calculate_rsi(stock)
 
         return stock
     except Exception as e:
