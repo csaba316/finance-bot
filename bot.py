@@ -162,25 +162,27 @@ def main():
     """ Main loop to run every 10 minutes """
     while True:
         print("📊 Fetching stock data...")
-        stock_data = fetch_stock_data()
+        stock_data = fetch_stock_data()  # Fetch stock data
 
-        if stock_data is not None:
-            stock_data = calculate_indicators(stock_data)
+        if stock_data is not None and not stock_data.empty:  # Ensure stock data is valid
+            stock_data = calculate_indicators(stock_data)  # Apply indicators
 
-            if stock_data is not None:
-                # Get the latest data row
-                latest_data = stock.iloc[-1].copy()  # Copy the last row to avoid modification issues
-                latest_data['RSI'] = stock['RSI'].iloc[-1]  # Force RSI value into the printed row
+            if stock_data is not None and not stock_data.empty:  # Re-check after indicators
+                # Get the latest data row safely
+                latest_data = stock_data.iloc[-1].copy()
+                latest_data['RSI'] = stock_data['RSI'].iloc[-1]  # Ensure RSI is included
 
                 print("📈 Latest Stock Data:")
                 print(latest_data)
 
-
                 # Send to Zapier
                 send_to_zapier(latest_data)
 
+        else:
+            print("❌ No valid stock data retrieved. Skipping Zapier request.")
+
         print("⏳ Waiting 10 minutes for next check...\n")
-        time.sleep(600)  # Wait 10 minutes
+        time.sleep(600)  # Wait 10 minutes before the next check
 
 if __name__ == "__main__":
     main()
