@@ -25,8 +25,8 @@ def calculate_rsi(data, window=14):
     print(loss.tail(20))
 
     # Fix: Use Exponential Moving Average (EMA) instead of rolling mean
-    avg_gain = gain.ewm(span=window, adjust=False).mean()
-    avg_loss = loss.ewm(span=window, adjust=False).mean()
+    avg_gain = gain.ewm(span=14, adjust=False).mean()
+    avg_loss = loss.ewm(span=14, adjust=False).mean()
 
     print("🔍 Debugging EMA Gains & Losses:")
     print(avg_gain.tail(20))
@@ -54,7 +54,7 @@ def calculate_rsi(data, window=14):
 def fetch_stock_data():
     """ Fetch NVIDIA stock data, resample to 10-minute intervals, and calculate indicators. """
     try:
-        stock = yf.download("NVDA", period="5d", interval="1m", group_by="ticker", prepost=True)
+        stock = yf.download("NVDA", period="7d", interval="10m", group_by="ticker", prepost=True)
 
         if stock.empty:
             raise ValueError("❌ Yahoo Finance returned an empty dataset. Try increasing the period or changing the interval.")
