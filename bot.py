@@ -177,11 +177,11 @@ def main():
                 print("📈 Latest Stock Data:")
                 print(latest_data)
 
-                # Fill NaN values BEFORE converting to dictionary
-                latest_data = latest_data.fillna(0)  # Ensure no NaN values
+                # **Apply fillna() BEFORE converting to dictionary**
+                latest_data_clean = latest_data.fillna(0)  # Ensure no NaN values
 
                 # Convert DataFrame row to a dictionary for Zapier
-                json_payload = latest_data.reset_index().to_dict(orient="records")[0]  # Convert to dictionary
+                json_payload = latest_data_clean.reset_index().to_dict(orient="records")[0]  # Convert to dictionary
 
                 # Send to Zapier
                 send_to_zapier(json_payload)
