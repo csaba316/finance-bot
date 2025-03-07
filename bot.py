@@ -16,10 +16,11 @@ def fetch_stock_data():
         if stock.empty:
             raise ValueError("❌ Yahoo Finance returned an empty dataset. Try increasing the period or changing the interval.")
 
-        # Flatten MultiIndex columns
-        stock.columns = [col[0] for col in stock.columns]
+        # Drop MultiIndex (if present)
+        if isinstance(stock.columns, pd.MultiIndex):
+            stock.columns = stock.columns.droplevel(0)  # Remove MultiIndex
 
-        print("✅ Renamed Columns:", stock.columns)  # Debugging Step
+        print("✅ Fixed Columns:", stock.columns)  # Debugging Step
 
         # Ensure required columns exist
         expected_columns = {'Open', 'High', 'Low', 'Close', 'Volume'}
@@ -34,8 +35,6 @@ def fetch_stock_data():
     except Exception as e:
         print(f"❌ Error fetching stock data: {e}")
         return None
-
-
 
 def calculate_indicators(stock):
     """ Calculate RSI, SMA, MACD, Bollinger Bands, and ATR """
