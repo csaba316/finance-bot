@@ -84,7 +84,14 @@ def calculate_indicators(stock):
 
 def send_to_zapier(data):
     """ Send latest stock indicators to Zapier webhook """
+    if not ZAPIER_WEBHOOK_URL:
+        print("❌ Error: Zapier Webhook URL is not set.")
+        return
+
     try:
+        # Replace NaN values with 0 or "N/A"
+        data = data.fillna(0)  # Converts NaN to 0 (or use "N/A" if preferred)
+        
         payload = {
             "Stock": "NVDA",
             "Close_Price": data['Close'],
