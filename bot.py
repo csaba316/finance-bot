@@ -169,8 +169,12 @@ def main():
 
             if stock_data is not None:
                 # Get the latest data row
-                latest_data = stock_data.iloc[-1]
-                print(f"📈 Latest Stock Data:\n{latest_data}")
+                latest_data = stock.iloc[-1].copy()  # Copy the last row to avoid modification issues
+                latest_data['RSI'] = stock['RSI'].iloc[-1]  # Force RSI value into the printed row
+
+                print("📈 Latest Stock Data:")
+                print(latest_data)
+
 
                 # Send to Zapier
                 send_to_zapier(latest_data)
