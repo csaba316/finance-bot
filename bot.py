@@ -24,6 +24,7 @@ def calculate_rsi(data, window=14):
     print(gain.tail(20))
     print(loss.tail(20))
 
+    # Check rolling calculations
     avg_gain = gain.rolling(window=window, min_periods=1).mean()
     avg_loss = loss.rolling(window=window, min_periods=1).mean()
 
@@ -35,12 +36,17 @@ def calculate_rsi(data, window=14):
     rs = avg_gain / (avg_loss + 1e-10)  # Prevent division by zero
     rsi = 100 - (100 / (1 + rs))
 
+    print("🔍 Debugging RSI Values (Before Filling NaNs):")
+    print(rsi.tail(20))
+
     # Ensure NaN values are handled correctly
     rsi = rsi.dropna()  # Remove any remaining NaN values
     rsi = rsi.fillna(50)  # Set remaining NaNs to 50 (neutral RSI)
 
-    return rsi
+    print("🔍 Debugging RSI Values (After Fix):")
+    print(rsi.tail(20))
 
+    return rsi
     
 def fetch_stock_data():
     """ Fetch NVIDIA stock data, resample to 10-minute intervals, and calculate indicators. """
