@@ -24,7 +24,11 @@ def calculate_rsi(data, window=14):
     # Calculate RSI
     rs = avg_gain / (avg_loss + 1e-10)  # Prevent division by zero
     rsi = 100 - (100 / (1 + rs))
-
+    
+     # **Fix RSI NaN values by backfilling**
+    rsi.fillna(method="bfill", inplace=True)  # Backfill missing RSI values
+    rsi.fillna(50, inplace=True)  # Set any remaining NaNs to 50 (neutral RSI)
+    
     return rsi
 
     
