@@ -196,6 +196,11 @@ def main():
                 print("🔍 Debugging Gain and Loss:")
                 print(gain.tail(20))
                 print(loss.tail(20))
+
+                print("🔍 Debugging Average Gains & Losses:")
+                print(avg_gain.tail(20))
+                print(avg_loss.tail(20))
+
                 
                 # Get the latest row including RSI correctly
                 latest_data = stock_data.iloc[[-1]].copy()  # Extract the last row as a DataFrame
