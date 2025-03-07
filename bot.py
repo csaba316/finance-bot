@@ -135,32 +135,40 @@ def send_to_zapier(data):
         return
 
     try:
-        # Replace NaN values with 0 or "N/A"
-        data = data.fillna(0)  # Converts NaN to 0 (or use "N/A" if preferred)
-        
+        # Ensure 'data' is a dictionary
+        if not isinstance(data, dict):
+            raise TypeError("❌ Data passed to Zapier is not a dictionary.")
+
+        # Replace None values (equivalent to NaN in JSON) with 0
+        cleaned_data = {key: (0 if value is None else value) for key, value in data.items()}
+
+        # Create payload for Zapier
         payload = {
             "Stock": "NVDA",
-            "Close_Price": data['Close'],
-            "RSI": data['RSI'],
-            "SMA_50": data['SMA_50'],
-            "SMA_200": data['SMA_200'],
-            "MACD": data['MACD'],
-            "MACD_Signal": data['MACD_Signal'],
-            "Upper_Band": data['Upper_Band'],
-            "Lower_Band": data['Lower_Band'],
-            "ATR": data['ATR']
+            "Close_Price": cleaned_data.get('Close', 0),
+            "RSI": cleaned_data.get('RSI', 0),
+            "SMA_50": cleaned_data.get('SMA_50', 0),
+            "SMA_200": cleaned_data.get('SMA_200', 0),
+            "MACD": cleaned_data.get('MACD', 0),
+            "MACD_Signal": cleaned_data.get('MACD_Signal', 0),
+            "Upper_Band": cleaned_data.get('Upper_Band', 0),
+            "Lower_Band": cleaned_data.get('Lower_Band', 0),
+            "ATR": cleaned_data.get('ATR', 0)
         }
 
+        print("🚀 Sending Data to Zapier:", payload)  # Debugging step
+
+        # Send data to Zapier webhook
         response = requests.post(ZAPIER_WEBHOOK_URL, json=payload)
+
         if response.status_code == 200:
             print("✅ Data sent to Zapier successfully!")
         else:
             print("❌ Failed to send data to Zapier. Response:", response.text)
+
     except Exception as e:
         print(f"❌ Error sending data to Zapier: {e}")
-
-import time
-
+        
 def main():
     """ Main loop to run every 10 minutes """
     while True:
