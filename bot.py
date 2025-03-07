@@ -10,20 +10,25 @@ ZAPIER_WEBHOOK_URL = os.getenv("ZAPIER_WEBHOOK_URL")
 
 def calculate_rsi(data, window=14):
     """Calculate RSI using 10-minute closing prices."""
-    delta = data['Close'].diff(1)
-    gain = np.where(delta > 0, delta, 0)
-    loss = np.where(delta < 0, -delta, 0)
+    delta = data['Close'].diff()  # Get price difference between periods
 
-    avg_gain = pd.Series(gain).rolling(window=window, min_periods=window).mean()
-    avg_loss = pd.Series(loss).rolling(window=window, min_periods=window).mean()
+    # Separate gains and losses
+    gain = delta.where(delta > 0, 0)  
+    loss = -delta.where(delta < 0, 0)  
 
-    rs = avg_gain / (avg_loss + 1e-10)  # Avoid division by zero
+    # Calculate rolling averages for gains and losses
+    avg_gain = gain.rolling(window=window, min_periods=window).mean()
+    avg_loss = loss.rolling(window=window, min_periods=window).mean()
+
+    # Calculate RSI
+    rs = avg_gain / (avg_loss + 1e-10)  # Prevent division by zero
     rsi = 100 - (100 / (1 + rs))
 
     return rsi
+
     
 def fetch_stock_data():
-    """ Fetch NVIDIA stock data, resample to 10-minute intervals, and calculate indicators with NaN fixes """
+    """ Fetch NVIDIA stock data, resample to 10-minute intervals, and calculate indicators. """
     try:
         stock = yf.download("NVDA", period="5d", interval="1m", group_by="ticker")
 
@@ -48,9 +53,9 @@ def fetch_stock_data():
         # Drop rows where 'Close' is NaN (which happens after resampling)
         stock.dropna(subset=['Close'], inplace=True)
 
-        # Debugging Step: Check if Close column has NaN before RSI calculation
+        # Debugging Step: Ensure Close column is valid before RSI calculation
         print("📊 Checking NaN values before RSI calculation:")
-        print(stock[['Close']].isna().sum())  # This should return 0
+        print(stock[['Close']].isna().sum())  # Should return 0
 
         # Calculate RSI
         stock['RSI'] = calculate_rsi(stock)
