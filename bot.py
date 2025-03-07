@@ -177,14 +177,18 @@ def main():
                 print("📈 Latest Stock Data:")
                 print(latest_data)
 
-                # **Apply fillna() BEFORE converting to dictionary**
+                # **Ensure fillna() is applied BEFORE converting to dict**
                 latest_data_clean = latest_data.fillna(0)  # Ensure no NaN values
 
                 # Convert DataFrame row to a dictionary for Zapier
-                json_payload = latest_data_clean.reset_index().to_dict(orient="records")[0]  # Convert to dictionary
+                json_payload = latest_data_clean.reset_index().to_dict(orient="records")[0]  # Convert to dict
+
+                # Debugging Step: Ensure json_payload is a dictionary and does NOT contain fillna()
+                print("✅ Final JSON Payload for Zapier:")
+                print(json_payload)
 
                 # Send to Zapier
-                send_to_zapier(json_payload)
+                send_to_zapier(json_payload)  # This must accept a dictionary, not a DataFrame!
 
         else:
             print("❌ No valid stock data retrieved. Skipping Zapier request.")
