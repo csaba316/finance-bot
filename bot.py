@@ -24,7 +24,7 @@ def calculate_rsi(data, window=14):
     print(gain.tail(20))
     print(loss.tail(20))
 
-    # Check rolling calculations
+    # Fix: Ensure rolling calculations work with minimal data
     avg_gain = gain.rolling(window=window, min_periods=1).mean()
     avg_loss = loss.rolling(window=window, min_periods=1).mean()
 
@@ -32,22 +32,19 @@ def calculate_rsi(data, window=14):
     print(avg_gain.tail(20))
     print(avg_loss.tail(20))
 
-    # If avg_gain or avg_loss are NaN, print issue
-    if avg_gain.isna().all():
-        print("❌ ERROR: All avg_gain values are NaN!")
-    if avg_loss.isna().all():
-        print("❌ ERROR: All avg_loss values are NaN!")
+    # Fix: Replace NaN losses with a small value to ensure division doesn't fail
+    avg_loss.replace(0, 1e-10, inplace=True)  
 
     # Calculate RSI
-    rs = avg_gain / (avg_loss + 1e-10)  # Prevent division by zero
+    rs = avg_gain / avg_loss  # No more zero-division errors
     rsi = 100 - (100 / (1 + rs))
 
-    print("🔍 Debugging RSI Values (Before Filling NaNs):")
+    print("🔍 Debugging RSI Values (Before Fixing NaNs):")
     print(rsi.tail(20))
 
-    # Ensure NaN values are handled correctly
-    rsi = rsi.dropna()  # Remove any remaining NaN values
-    rsi = rsi.fillna(50)  # Set remaining NaNs to 50 (neutral RSI)
+    # Fix: Ensure NaN values are handled correctly
+    rsi.fillna(method="bfill", inplace=True)  # Backfill to fill gaps
+    rsi.fillna(50, inplace=True)  # Set any remaining NaNs to 50 (neutral RSI)
 
     print("🔍 Debugging RSI Values (After Fix):")
     print(rsi.tail(20))
