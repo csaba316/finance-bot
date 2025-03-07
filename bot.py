@@ -1,5 +1,6 @@
 import os
 import time
+import json
 import requests
 import yfinance as yf
 import pandas as pd
@@ -176,8 +177,11 @@ def main():
                 print("📈 Latest Stock Data:")
                 print(latest_data)
 
+                # Convert DataFrame row to JSON-friendly format
+                json_payload = json.loads(latest_data.to_json(orient="records"))[0]  # Convert to valid JSON format
+
                 # Send to Zapier
-                send_to_zapier(latest_data.to_dict(orient="records")[0])  # Convert to JSON format
+                send_to_zapier(json_payload)
 
         else:
             print("❌ No valid stock data retrieved. Skipping Zapier request.")
