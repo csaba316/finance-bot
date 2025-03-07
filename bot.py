@@ -31,7 +31,7 @@ def calculate_rsi(data, window=14):
 def fetch_stock_data():
     """ Fetch NVIDIA stock data, resample to 10-minute intervals, and calculate indicators. """
     try:
-        stock = yf.download("NVDA", period="5d", interval="1m", group_by="ticker")
+        stock = yf.download("NVDA", period="5d", interval="1m", group_by="ticker", prepost=True)
 
         if stock.empty:
             raise ValueError("❌ Yahoo Finance returned an empty dataset. Try increasing the period or changing the interval.")
@@ -75,6 +75,14 @@ def fetch_stock_data():
 
         # Fill remaining NaN values
         stock.fillna(0, inplace=True)
+        
+# Debug RSI Calculation
+print("🔍 Debugging RSI Calculation:")
+print(stock_data[['Close', 'RSI']].tail(20))  # Last 20 RSI values
+
+# Debug SMA_200 Calculation
+print("🔍 Debugging SMA_200 Calculation:")
+print(stock_data[['Close', 'SMA_200']].tail(20))  # Last 20 SMA_200 values
 
         return stock
     except Exception as e:
