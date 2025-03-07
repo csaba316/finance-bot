@@ -177,8 +177,8 @@ def main():
                 print("📈 Latest Stock Data:")
                 print(latest_data)
 
-                # Convert DataFrame row to JSON-friendly format
-                json_payload = json.loads(latest_data.to_json(orient="records"))[0]  # Convert to valid JSON format
+                # Convert DataFrame row to a dictionary properly
+                json_payload = latest_data.reset_index().to_dict(orient="records")[0]  # Reset index to fix errors
 
                 # Send to Zapier
                 send_to_zapier(json_payload)
