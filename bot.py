@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 
 # Replace with your Zapier Webhook URL
-ZAPIER_WEBHOOK_URL = "https://hooks.zapier.com/hooks/catch/YOUR_WEBHOOK_ID/"
+ZAPIER_WEBHOOK_URL = os.getenv("ZAPIER_WEBHOOK_URL")
 
 def fetch_stock_data():
     """ Fetch NVIDIA stock data and resample to 10-minute intervals """
