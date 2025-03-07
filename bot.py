@@ -170,25 +170,20 @@ def main():
             stock_data = calculate_indicators(stock_data)  # Apply indicators
 
             if stock_data is not None and not stock_data.empty:  # Re-check after indicators
-                # Get the latest data row safely
-                latest_data = stock_data.iloc[-1].copy()
-                latest_data.at['RSI'] = stock_data['RSI'].iloc[-1]  # Ensure RSI is included
+                # Get the latest row including RSI correctly
+                latest_data = stock_data.iloc[[-1]].copy()  # Extract the last row as a DataFrame
 
                 print("📈 Latest Stock Data:")
                 print(latest_data)
 
                 # Send to Zapier
-                send_to_zapier(latest_data)
+                send_to_zapier(latest_data.to_dict(orient="records")[0])  # Convert to JSON format
 
         else:
             print("❌ No valid stock data retrieved. Skipping Zapier request.")
 
         print("⏳ Waiting 10 minutes for next check...\n")
         time.sleep(600)  # Wait 10 minutes before the next check
-
-if __name__ == "__main__":
-    main()
-
 
 if __name__ == "__main__":
     main()
