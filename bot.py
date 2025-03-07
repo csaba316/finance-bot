@@ -32,6 +32,12 @@ def calculate_rsi(data, window=14):
     print(avg_gain.tail(20))
     print(avg_loss.tail(20))
 
+    # If avg_gain or avg_loss are NaN, print issue
+    if avg_gain.isna().all():
+        print("❌ ERROR: All avg_gain values are NaN!")
+    if avg_loss.isna().all():
+        print("❌ ERROR: All avg_loss values are NaN!")
+
     # Calculate RSI
     rs = avg_gain / (avg_loss + 1e-10)  # Prevent division by zero
     rsi = 100 - (100 / (1 + rs))
