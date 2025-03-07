@@ -10,9 +10,9 @@ import numpy as np
 ZAPIER_WEBHOOK_URL = os.getenv("ZAPIER_WEBHOOK_URL")
 
 def calculate_rsi(data, window=14):
-    """Calculate RSI using 10-minute closing prices."""
+    """Calculate RSI using Exponential Moving Average instead of Rolling Mean."""
     delta = data['Close'].diff()
-    
+
     print("🔍 Debugging Price Differences (Delta):")
     print(delta.tail(20))  # Print last 20 deltas
 
@@ -24,25 +24,25 @@ def calculate_rsi(data, window=14):
     print(gain.tail(20))
     print(loss.tail(20))
 
-    # Fix: Ensure rolling calculations work with minimal data
-    avg_gain = gain.rolling(window=window, min_periods=1).mean()
-    avg_loss = loss.rolling(window=window, min_periods=1).mean()
+    # Fix: Use Exponential Moving Average (EMA) instead of rolling mean
+    avg_gain = gain.ewm(span=window, adjust=False).mean()
+    avg_loss = loss.ewm(span=window, adjust=False).mean()
 
-    print("🔍 Debugging Average Gains & Losses:")
+    print("🔍 Debugging EMA Gains & Losses:")
     print(avg_gain.tail(20))
     print(avg_loss.tail(20))
 
-    # Fix: Replace NaN losses with a small value to ensure division doesn't fail
-    avg_loss.replace(0, 1e-10, inplace=True)  
+    # Prevent division errors by replacing zero values in avg_loss
+    avg_loss.replace(0, 1e-10, inplace=True)
 
     # Calculate RSI
-    rs = avg_gain / avg_loss  # No more zero-division errors
+    rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
 
     print("🔍 Debugging RSI Values (Before Fixing NaNs):")
     print(rsi.tail(20))
 
-    # Fix: Ensure NaN values are handled correctly
+    # Ensure NaN values are handled correctly
     rsi.fillna(method="bfill", inplace=True)  # Backfill to fill gaps
     rsi.fillna(50, inplace=True)  # Set any remaining NaNs to 50 (neutral RSI)
 
