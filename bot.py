@@ -11,8 +11,13 @@ ZAPIER_WEBHOOK_URL = os.getenv("ZAPIER_WEBHOOK_URL")
 def fetch_stock_data():
     """ Fetch NVIDIA stock data and resample to 10-minute intervals """
     try:
-        stock = yf.download("NVDA", period="2d", interval="1m")  # Get 1-min data
-        stock = stock.resample('10T').agg({'Open':'first', 'High':'max', 'Low':'min', 'Close':'last', 'Volume':'sum'})
+        stock = yf.download("NVDA", period="5d", interval="1m")  # Increase data range
+
+        if stock.empty:
+            raise ValueError("❌ Yahoo Finance returned an empty dataset. Try increasing the period or changing the interval.")
+
+        stock = stock.resample('10min').agg({'Open':'first', 'High':'max', 'Low':'min', 'Close':'last', 'Volume':'sum'})
+
         return stock
     except Exception as e:
         print(f"❌ Error fetching stock data: {e}")
