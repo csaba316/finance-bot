@@ -61,8 +61,8 @@ def fetch_stock_data():
         stock['RSI'] = calculate_rsi(stock)
 
         # Fix remaining NaN values in RSI
-        stock['RSI'].fillna(method="bfill", inplace=True)  # Backfill to remove first NaNs
-        stock['RSI'].fillna(50, inplace=True)  # Default to 50 if still NaN (neutral RSI)
+        stock['RSI'] = stock['RSI'].bfill()  # Backfill NaN values
+        stock['RSI'] = stock['RSI'].fillna(50)  # Default to 50 if still NaN (neutral RSI)
 
         # Debugging Step: Check if RSI column is NaN after calculation
         print("📈 Checking NaN values after RSI calculation:")
