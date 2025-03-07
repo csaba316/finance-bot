@@ -36,14 +36,6 @@ def fetch_stock_data():
         if stock.empty:
             raise ValueError("❌ Yahoo Finance returned an empty dataset. Try increasing the period or changing the interval.")
         
-# Debug RSI Calculation
-print("🔍 Debugging RSI Calculation:")
-print(stock_data[['Close', 'RSI']].tail(20))  # Last 20 RSI values
-
-# Debug SMA_200 Calculation
-print("🔍 Debugging SMA_200 Calculation:")
-print(stock_data[['Close', 'SMA_200']].tail(20))  # Last 20 SMA_200 values
-        
         # Drop MultiIndex (if present)
         if isinstance(stock.columns, pd.MultiIndex):
             stock.columns = stock.columns.droplevel(0)  # Remove MultiIndex
@@ -187,6 +179,14 @@ def main():
             stock_data = calculate_indicators(stock_data)  # Apply indicators
 
             if stock_data is not None and not stock_data.empty:  # Re-check after indicators
+                # Debug RSI Calculation
+                print("🔍 Debugging RSI Calculation:")
+                print(stock_data[['Close', 'RSI']].tail(20))  # Last 20 RSI values
+
+                # Debug SMA_200 Calculation
+                print("🔍 Debugging SMA_200 Calculation:")
+                print(stock_data[['Close', 'SMA_200']].tail(20))  # Last 20 SMA_200 values
+                
                 # Get the latest row including RSI correctly
                 latest_data = stock_data.iloc[[-1]].copy()  # Extract the last row as a DataFrame
 
