@@ -14,8 +14,8 @@ def calculate_rsi(data, window=14):
     gain = np.where(delta > 0, delta, 0)
     loss = np.where(delta < 0, -delta, 0)
 
-    avg_gain = pd.Series(gain).rolling(window=window, min_periods=1).mean()
-    avg_loss = pd.Series(loss).rolling(window=window, min_periods=1).mean()
+    avg_gain = pd.Series(gain).rolling(window=window, min_periods=window).mean()
+    avg_loss = pd.Series(loss).rolling(window=window, min_periods=window).mean()
 
     rs = avg_gain / (avg_loss + 1e-10)  # Avoid division by zero
     rsi = 100 - (100 / (1 + rs))
@@ -45,17 +45,26 @@ def fetch_stock_data():
         # Resample to 10-minute intervals
         stock = stock.resample('10min').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'})
 
-        # Drop NaN values after resampling
-        stock = stock.dropna()
+        # Drop rows where 'Close' is NaN (which happens after resampling)
+        stock.dropna(subset=['Close'], inplace=True)
 
-        # Calculate Indicators
+        # Debugging Step: Check if Close column has NaN before RSI calculation
+        print("📊 Checking NaN values before RSI calculation:")
+        print(stock[['Close']].isna().sum())  # This should return 0
+
+        # Calculate RSI
         stock['RSI'] = calculate_rsi(stock)
-        stock['SMA_50'] = stock['Close'].rolling(window=50).mean()
-        stock['SMA_200'] = stock['Close'].rolling(window=200).mean()
 
-        # Handle NaN values
-        stock.fillna(method="ffill", inplace=True)  # Forward-fill missing values
-        stock.fillna(method="bfill", inplace=True)  # Backfill as a backup
+        # Debugging Step: Check if RSI column is NaN after calculation
+        print("📈 Checking NaN values after RSI calculation:")
+        print(stock[['RSI']].isna().sum())  # If this is 0, RSI is working
+
+        # Only compute SMA if we have enough data points
+        stock['SMA_50'] = stock['Close'].rolling(window=50, min_periods=50).mean()
+        stock['SMA_200'] = stock['Close'].rolling(window=200, min_periods=200).mean()
+
+        # Fill remaining NaN values
+        stock.fillna(0, inplace=True)
 
         return stock
     except Exception as e:
