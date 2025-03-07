@@ -20,16 +20,24 @@ def calculate_rsi(data, window=14):
     gain = delta.where(delta > 0, 0)
     loss = -delta.where(delta < 0, 0)
 
+    print("🔍 Debugging Gain and Loss:")
+    print(gain.tail(20))
+    print(loss.tail(20))
+
     avg_gain = gain.rolling(window=window, min_periods=1).mean()
     avg_loss = loss.rolling(window=window, min_periods=1).mean()
+
+    print("🔍 Debugging Average Gains & Losses:")
+    print(avg_gain.tail(20))
+    print(avg_loss.tail(20))
 
     # Calculate RSI
     rs = avg_gain / (avg_loss + 1e-10)  # Prevent division by zero
     rsi = 100 - (100 / (1 + rs))
 
     # Ensure NaN values are handled correctly
-    rsi = rsi.fillna(method="bfill")  # Backfill missing values
-    rsi = rsi.fillna(50)  # Set any remaining NaNs to 50 (neutral RSI)
+    rsi = rsi.dropna()  # Remove any remaining NaN values
+    rsi = rsi.fillna(50)  # Set remaining NaNs to 50 (neutral RSI)
 
     return rsi
 
