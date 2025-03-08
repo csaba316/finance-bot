@@ -108,19 +108,9 @@ def fetch_stock_data():
 def calculate_indicators(stock):
     """ Calculate RSI, SMA, MACD, Bollinger Bands, and ATR """
     try:
-        # RSI Calculation
-        def calculate_rsi(data, window=14):
-            delta = data['Close'].diff(1)
-            gain = np.where(delta > 0, delta, 0)
-            loss = np.where(delta < 0, -delta, 0)
-
-            avg_gain = pd.Series(gain).rolling(window=window, min_periods=1).mean()
-            avg_loss = pd.Series(loss).rolling(window=window, min_periods=1).mean()
-
-            rs = avg_gain / (avg_loss + 1e-10)  # Avoid division by zero
-            rsi = 100 - (100 / (1 + rs))
-            return rsi
-
+        # Compute RSI
+        stock['RSI'] = calculate_rsi(stock)
+        
         # Moving Averages
         stock['SMA_50'] = stock['Close'].rolling(window=50).mean()
         stock['SMA_200'] = stock['Close'].rolling(window=200).mean()
@@ -202,13 +192,14 @@ def main():
             stock_data = calculate_indicators(stock_data)  # Apply indicators
 
             if stock_data is not None and not stock_data.empty:  # Re-check after indicators
-                # Debug RSI Calculation
-                print("🔍 Debugging RSI Calculation:")
-                print(stock_data[['Close', 'RSI']].tail(20))  # Last 20 RSI values
+               # Debugging RSI & SMA Calculation (Print only if issues persist)
+                if stock_data['RSI'].isna().sum() > 0:
+                    print("🔍 Debugging RSI Calculation:")
+                    print(stock_data[['Close', 'RSI']].tail(20))
 
-                # Debug SMA_200 Calculation
-                print("🔍 Debugging SMA_200 Calculation:")
-                print(stock_data[['Close', 'SMA_200']].tail(20))  # Last 20 SMA_200 values
+                if stock_data['SMA_200'].isna().sum() > 0:
+                    print("🔍 Debugging SMA_200 Calculation:")
+                    print(stock_data[['Close', 'SMA_200']].tail(20))
                 
                 # Get the latest row including RSI correctly
                 latest_data = stock_data.iloc[[-1]].copy()  # Extract the last row as a DataFrame
