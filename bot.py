@@ -39,7 +39,7 @@ def calculate_rsi(data, window=14):
 def fetch_stock_data():
     """ Fetch NVIDIA stock data, resample to 10-minute intervals, and calculate indicators. """
     try:
-        stock = yf.download("NVDA", period="7d", interval="10m", group_by="ticker", prepost=True)
+        stock = yf.download("NVDA", period="7d", interval="5m", group_by="ticker", prepost=True)
 
         if stock.empty:
             raise ValueError("❌ Yahoo Finance returned an empty dataset. Try increasing the period or changing the interval.")
