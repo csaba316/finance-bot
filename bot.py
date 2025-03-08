@@ -30,7 +30,7 @@ def calculate_rsi(data, window=14):
     rsi = 100 - (100 / (1 + rs))
 
     # Ensure NaN values are handled correctly
-    rsi.fillna(method="bfill", inplace=True)  # Backfill to fill gaps
+    rsi.bfill(inplace=True)  # Backfill to fill gaps
     rsi.fillna(50, inplace=True)  # Default to 50 (neutral RSI) if still NaN
 
     return rsi
