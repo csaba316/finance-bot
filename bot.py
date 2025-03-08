@@ -145,6 +145,10 @@ def main():
                 latest_data = stock_data.iloc[[-1]].copy()
                 json_payload = latest_data.fillna(0).reset_index().to_dict(orient="records")[0]
 
+                # ✅ Convert Timestamp to string
+                if "Datetime" in json_payload:
+                    json_payload["Datetime"] = str(json_payload["Datetime"])
+
                 print("📈 Latest Stock Data (Always Visible):")
                 print(json.dumps(json_payload, indent=2))
 
