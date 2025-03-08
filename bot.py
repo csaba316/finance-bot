@@ -10,43 +10,58 @@ import numpy as np
 ZAPIER_WEBHOOK_URL = os.getenv("ZAPIER_WEBHOOK_URL")
 
 def fetch_stock_data():
-    """ Fetch NVIDIA stock data & compute indicators. """
+    """ Fetch NVIDIA stock data, resample to 5-minute intervals, and calculate indicators. """
     try:
-        stock = yf.download("NVDA", period="7d", interval="10m", group_by="ticker", prepost=True)
+        stock = yf.download("NVDA", period="7d", interval="5m", group_by="ticker", prepost=True)
 
         if stock.empty:
-            raise ValueError("❌ Yahoo Finance returned an empty dataset.")
+            raise ValueError("❌ Yahoo Finance returned an empty dataset. Try increasing the period or changing the interval.")
+        
+        # Drop MultiIndex if present
+        if isinstance(stock.columns, pd.MultiIndex):
+            stock.columns = stock.columns.droplevel(0)
 
-        stock = stock[['Open', 'High', 'Low', 'Close', 'Volume']]
+        print("✅ Fixed Columns:", stock.columns)  # Debugging Step
 
-        # Resample to 10-minute intervals
-        stock = stock.resample('10min').agg({
-            'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
-        }).dropna()
+        # Ensure required columns exist
+        expected_columns = {'Open', 'High', 'Low', 'Close', 'Volume'}
+        missing_columns = expected_columns - set(stock.columns)
+        if missing_columns:
+            raise ValueError(f"❌ Missing columns in data: {missing_columns}")
 
+        # Resample to 5-minute intervals
+        stock = stock.resample('5min').agg({
+            'Open': 'first', 
+            'High': 'max', 
+            'Low': 'min', 
+            'Close': 'last', 
+            'Volume': 'sum'
+        })
+
+        # Drop rows where 'Close' is NaN (which happens after resampling)
+        stock.dropna(subset=['Close'], inplace=True)
+
+        print("📊 Checking NaN values before RSI calculation:")
+        print(stock[['Close']].isna().sum())  # Should return 0
+
+        # Calculate RSI
         stock['RSI'] = calculate_rsi(stock)
-        stock['SMA_50'] = stock['Close'].rolling(window=50).mean()
-        stock['SMA_200'] = stock['Close'].rolling(window=200).mean()
 
-        # MACD
-        stock['MACD'] = stock['Close'].ewm(span=12, adjust=False).mean() - stock['Close'].ewm(span=26, adjust=False).mean()
-        stock['MACD_Signal'] = stock['MACD'].ewm(span=9, adjust=False).mean()
+        # Drop initial NaN values and fill the rest
+        stock['RSI'] = stock['RSI'].dropna()
+        stock['RSI'].fillna(50, inplace=True)  
 
-        # Bollinger Bands
-        stock['Middle_Band'] = stock['Close'].rolling(window=20).mean()
-        stock['Upper_Band'] = stock['Middle_Band'] + (stock['Close'].rolling(window=20).std() * 2)
-        stock['Lower_Band'] = stock['Middle_Band'] - (stock['Close'].rolling(window=20).std() * 2)
+        print("📈 Checking NaN values after RSI calculation:")
+        print(stock[['RSI']].isna().sum())  # Should return 0
 
-        # ATR (Volatility Measurement)
-        stock['High-Low'] = stock['High'] - stock['Low']
-        stock['High-Close'] = abs(stock['High'] - stock['Close'].shift())
-        stock['Low-Close'] = abs(stock['Low'] - stock['Close'].shift())
-        stock['True_Range'] = stock[['High-Low', 'High-Close', 'Low-Close']].max(axis=1)
-        stock['ATR'] = stock['True_Range'].rolling(window=14).mean()
+        # Compute SMA
+        stock['SMA_50'] = stock['Close'].rolling(window=50, min_periods=50).mean()
+        stock['SMA_200'] = stock['Close'].rolling(window=200, min_periods=200).mean()
 
+        # Fill remaining NaN values
         stock.fillna(0, inplace=True)
-        return stock
 
+        return stock
     except Exception as e:
         print(f"❌ Error fetching stock data: {e}")
         return None
