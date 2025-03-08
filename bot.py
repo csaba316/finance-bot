@@ -62,7 +62,7 @@ def calculate_rsi(data, window=14):
 
 # ✅ **Fetch Stock Data**
 def fetch_stock_data():
-    """Fetch NVIDIA stock data, resample to 10-minute intervals, and calculate indicators."""
+    """Fetch NVIDIA stock data, resample to 5-minute intervals, and calculate indicators."""
     try:
         stock = yf.download("NVDA", period="7d", interval="5m", group_by="ticker", prepost=True)
 
@@ -82,7 +82,7 @@ def fetch_stock_data():
             raise ValueError(f"❌ Missing columns in data: {missing_columns}")
 
         # Resample to 10-minute intervals
-        stock = stock.resample('10min').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'})
+        stock = stock.resample('5min').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'})
         stock.dropna(subset=['Close'], inplace=True)  # Drop NaN close values
 
         # Calculate RSI
@@ -133,7 +133,7 @@ def calculate_indicators(stock):
 
 # ✅ **Main Loop**
 def main():
-    """Main loop to run every 10 minutes."""
+    """Main loop to run every 5 minutes."""
     while True:
         print("📊 Fetching stock data...")
         stock_data = fetch_stock_data()
@@ -158,8 +158,8 @@ def main():
                     print("🚀 Sending Data to Zapier:", json_payload)
                     send_to_zapier(json_payload)
 
-        print("⏳ Waiting 10 minutes for next check...\n")
-        time.sleep(600)
+        print("⏳ Waiting 5 minutes for next check...\n")
+        time.sleep(300)
 
 if __name__ == "__main__":
     main()
