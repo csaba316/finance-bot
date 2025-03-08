@@ -34,8 +34,10 @@ def is_market_open(stock_data):
 def calculate_rsi(data, window=14):
     """Calculate RSI using EMA, reusing last stored RSI if market is closed."""
     
-    # Check if market is closed
+    # Load last stored RSI
     last_data = load_last_valid_data()
+    
+    # If the market is closed, use last stored RSI but still return a Series
     if not is_market_open(data):
         if last_data and "RSI" in last_data:
             print("⏸️ Market is closed. Using last stored RSI.")
@@ -83,10 +85,6 @@ def fetch_stock_data():
         stock = stock.resample('10min').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'})
         stock.dropna(subset=['Close'], inplace=True)  # Drop NaN close values
 
-        # Debugging: Ensure 'Close' is valid before RSI calculation
-        print("📊 Checking NaN values before RSI calculation:")
-        print(stock[['Close']].isna().sum())  # Should return 0
-
         # Calculate RSI
         stock['RSI'] = calculate_rsi(stock)
 
@@ -133,34 +131,6 @@ def calculate_indicators(stock):
         print(f"❌ Error calculating indicators: {e}")
         return None
 
-# ✅ **Send Data to Zapier**
-def send_to_zapier(data):
-    """Send latest stock indicators to Zapier webhook."""
-    if not ZAPIER_WEBHOOK_URL:
-        print("❌ Error: Zapier Webhook URL is not set.")
-        return
-
-    try:
-        # Ensure 'data' is a dictionary
-        if not isinstance(data, dict):
-            raise TypeError("❌ Data passed to Zapier is not a dictionary.")
-
-        # Replace None values with 0
-        cleaned_data = {key: (0 if value is None else value) for key, value in data.items()}
-
-        print("🚀 Sending Data to Zapier:", cleaned_data)
-
-        # Send data to Zapier webhook
-        response = requests.post(ZAPIER_WEBHOOK_URL, json=cleaned_data)
-
-        if response.status_code == 200:
-            print("✅ Data sent to Zapier successfully!")
-        else:
-            print("❌ Failed to send data to Zapier. Response:", response.text)
-
-    except Exception as e:
-        print(f"❌ Error sending data to Zapier: {e}")
-
 # ✅ **Main Loop**
 def main():
     """Main loop to run every 10 minutes."""
@@ -172,12 +142,15 @@ def main():
             stock_data = calculate_indicators(stock_data)
 
             if stock_data is not None and not stock_data.empty:
+                latest_data = stock_data.iloc[[-1]].copy()
+                json_payload = latest_data.fillna(0).reset_index().to_dict(orient="records")[0]
+
+                print("📈 Latest Stock Data (Always Visible):")
+                print(json.dumps(json_payload, indent=2))
+
                 if not is_market_open(stock_data):
                     print("⏸️ Market is closed. Skipping Zapier request.")
                 else:
-                    latest_data = stock_data.iloc[[-1]].copy()
-                    json_payload = latest_data.fillna(0).reset_index().to_dict(orient="records")[0]
-
                     print("🚀 Sending Data to Zapier:", json_payload)
                     send_to_zapier(json_payload)
 
