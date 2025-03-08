@@ -9,61 +9,44 @@ import numpy as np
 # Replace with your Zapier Webhook URL
 ZAPIER_WEBHOOK_URL = os.getenv("ZAPIER_WEBHOOK_URL")
 
-def calculate_rsi(data, window=14):
-    """Calculate RSI using Exponential Moving Average instead of Rolling Mean."""
-    delta = data['Close'].diff()
 
-    print("🔍 Debugging Price Differences (Delta):")
-    print(delta.tail(20))  # Print last 20 deltas
+def calculate_rsi(data, window=14):
+    """Calculate RSI using Exponential Moving Average."""
+    delta = data['Close'].diff()
 
     # Separate gains and losses
     gain = delta.where(delta > 0, 0)
     loss = -delta.where(delta < 0, 0)
 
-    print("🔍 Debugging Gain and Loss:")
-    print(gain.tail(20))
-    print(loss.tail(20))
+    # Use EMA instead of rolling mean
+    avg_gain = gain.ewm(span=window, adjust=False).mean()
+    avg_loss = loss.ewm(span=window, adjust=False).mean()
 
-    # Fix: Use Exponential Moving Average (EMA) instead of rolling mean
-    avg_gain = gain.ewm(span=14, adjust=False).mean()
-    avg_loss = loss.ewm(span=14, adjust=False).mean()
-
-    print("🔍 Debugging EMA Gains & Losses:")
-    print(avg_gain.tail(20))
-    print(avg_loss.tail(20))
-
-    # Prevent division errors by replacing zero values in avg_loss
+    # Prevent division errors by replacing zero avg_loss values
     avg_loss.replace(0, 1e-10, inplace=True)
 
     # Calculate RSI
     rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
 
-    print("🔍 Debugging RSI Values (Before Fixing NaNs):")
-    print(rsi.tail(20))
-
     # Ensure NaN values are handled correctly
     rsi.fillna(method="bfill", inplace=True)  # Backfill to fill gaps
-    rsi.fillna(50, inplace=True)  # Set any remaining NaNs to 50 (neutral RSI)
-
-    print("🔍 Debugging RSI Values (After Fix):")
-    print(rsi.tail(20))
+    rsi.fillna(50, inplace=True)  # Default to 50 (neutral RSI) if still NaN
 
     return rsi
-    
+
+
 def fetch_stock_data():
     """ Fetch NVIDIA stock data, resample to 10-minute intervals, and calculate indicators. """
     try:
-        stock = yf.download("NVDA", period="7d", interval="5m", group_by="ticker", prepost=True)
+        stock = yf.download("NVDA", period="7d", interval="10m", group_by="ticker", prepost=True)
 
         if stock.empty:
             raise ValueError("❌ Yahoo Finance returned an empty dataset. Try increasing the period or changing the interval.")
-        
+
         # Drop MultiIndex (if present)
         if isinstance(stock.columns, pd.MultiIndex):
             stock.columns = stock.columns.droplevel(0)  # Remove MultiIndex
-
-        print("✅ Fixed Columns:", stock.columns)  # Debugging Step
 
         # Ensure required columns exist
         expected_columns = {'Open', 'High', 'Low', 'Close', 'Volume'}
@@ -77,69 +60,53 @@ def fetch_stock_data():
         # Drop rows where 'Close' is NaN (which happens after resampling)
         stock.dropna(subset=['Close'], inplace=True)
 
-        # Debugging Step: Ensure Close column is valid before RSI calculation
-        print("📊 Checking NaN values before RSI calculation:")
-        print(stock[['Close']].isna().sum())  # Should return 0
-
-        # Calculate RSI
-        stock['RSI'] = calculate_rsi(stock)
-    
-        # Fix: Drop initial NaN values before replacing them
-        stock['RSI'] = stock['RSI'].dropna()  # Remove first NaNs
-        stock['RSI'] = stock['RSI'].fillna(50)  # Set remaining NaNs to 5
-
-        # Debugging Step: Check if RSI column is NaN after calculation
-        print("📈 Checking NaN values after RSI calculation:")
-        print(stock[['RSI']].isna().sum())  # Should return 0
-
-        # Compute SMA
-        stock['SMA_50'] = stock['Close'].rolling(window=50, min_periods=50).mean()
-        stock['SMA_200'] = stock['Close'].rolling(window=200, min_periods=200).mean()
-
-        # Fill remaining NaN values
+        # Ensure data has no NaN before processing indicators
         stock.fillna(0, inplace=True)
 
         return stock
+
     except Exception as e:
         print(f"❌ Error fetching stock data: {e}")
         return None
 
-        
+
 def calculate_indicators(stock):
     """ Calculate RSI, SMA, MACD, Bollinger Bands, and ATR """
     try:
         # Compute RSI
         stock['RSI'] = calculate_rsi(stock)
-        
-        # Moving Averages
-        stock['SMA_50'] = stock['Close'].rolling(window=50).mean()
-        stock['SMA_200'] = stock['Close'].rolling(window=200).mean()
 
-        # MACD Calculation
+        # Compute SMA
+        stock['SMA_50'] = stock['Close'].rolling(window=50, min_periods=50).mean()
+        stock['SMA_200'] = stock['Close'].rolling(window=200, min_periods=200).mean()
+
+        # Compute MACD
         exp12 = stock['Close'].ewm(span=12, adjust=False).mean()
         exp26 = stock['Close'].ewm(span=26, adjust=False).mean()
         stock['MACD'] = exp12 - exp26
         stock['MACD_Signal'] = stock['MACD'].ewm(span=9, adjust=False).mean()
 
-        # Bollinger Bands
+        # Compute Bollinger Bands
         stock['Middle_Band'] = stock['Close'].rolling(window=20).mean()
         stock['Upper_Band'] = stock['Middle_Band'] + (stock['Close'].rolling(window=20).std() * 2)
         stock['Lower_Band'] = stock['Middle_Band'] - (stock['Close'].rolling(window=20).std() * 2)
 
-        # Average True Range (ATR)
+        # Compute ATR
         stock['High-Low'] = stock['High'] - stock['Low']
         stock['High-Close'] = abs(stock['High'] - stock['Close'].shift())
         stock['Low-Close'] = abs(stock['Low'] - stock['Close'].shift())
         stock['True_Range'] = stock[['High-Low', 'High-Close', 'Low-Close']].max(axis=1)
         stock['ATR'] = stock['True_Range'].rolling(window=14).mean()
 
-        # RSI Calculation
-        stock['RSI'] = calculate_rsi(stock)
+        # Ensure NaN-free data before sending to Zapier
+        stock.fillna(0, inplace=True)
 
         return stock
+
     except Exception as e:
         print(f"❌ Error calculating indicators: {e}")
         return None
+
 
 def send_to_zapier(data):
     """ Send latest stock indicators to Zapier webhook """
@@ -148,31 +115,15 @@ def send_to_zapier(data):
         return
 
     try:
-        # Ensure 'data' is a dictionary
         if not isinstance(data, dict):
             raise TypeError("❌ Data passed to Zapier is not a dictionary.")
 
-        # Replace None values (equivalent to NaN in JSON) with 0
+        # Replace None values with 0
         cleaned_data = {key: (0 if value is None else value) for key, value in data.items()}
 
-        # Create payload for Zapier
-        payload = {
-            "Stock": "NVDA",
-            "Close_Price": cleaned_data.get('Close', 0),
-            "RSI": cleaned_data.get('RSI', 0),
-            "SMA_50": cleaned_data.get('SMA_50', 0),
-            "SMA_200": cleaned_data.get('SMA_200', 0),
-            "MACD": cleaned_data.get('MACD', 0),
-            "MACD_Signal": cleaned_data.get('MACD_Signal', 0),
-            "Upper_Band": cleaned_data.get('Upper_Band', 0),
-            "Lower_Band": cleaned_data.get('Lower_Band', 0),
-            "ATR": cleaned_data.get('ATR', 0)
-        }
+        print("🚀 Sending Data to Zapier:", cleaned_data)  # Debugging step
 
-        print("🚀 Sending Data to Zapier:", payload)  # Debugging step
-
-        # Send data to Zapier webhook
-        response = requests.post(ZAPIER_WEBHOOK_URL, json=payload)
+        response = requests.post(ZAPIER_WEBHOOK_URL, json=cleaned_data)
 
         if response.status_code == 200:
             print("✅ Data sent to Zapier successfully!")
@@ -181,18 +132,19 @@ def send_to_zapier(data):
 
     except Exception as e:
         print(f"❌ Error sending data to Zapier: {e}")
-        
+
+
 def main():
     """ Main loop to run every 10 minutes """
     while True:
         print("📊 Fetching stock data...")
         stock_data = fetch_stock_data()  # Fetch stock data
 
-        if stock_data is not None and not stock_data.empty:  # Ensure stock data is valid
-            stock_data = calculate_indicators(stock_data)  # Apply indicators
+        if stock_data is not None and not stock_data.empty:
+            stock_data = calculate_indicators(stock_data)
 
-            if stock_data is not None and not stock_data.empty:  # Re-check after indicators
-               # Debugging RSI & SMA Calculation (Print only if issues persist)
+            if stock_data is not None and not stock_data.empty:
+                # Debugging RSI & SMA Calculation (Print only if issues persist)
                 if stock_data['RSI'].isna().sum() > 0:
                     print("🔍 Debugging RSI Calculation:")
                     print(stock_data[['Close', 'RSI']].tail(20))
@@ -200,31 +152,22 @@ def main():
                 if stock_data['SMA_200'].isna().sum() > 0:
                     print("🔍 Debugging SMA_200 Calculation:")
                     print(stock_data[['Close', 'SMA_200']].tail(20))
-                
-                # Get the latest row including RSI correctly
-                latest_data = stock_data.iloc[[-1]].copy()  # Extract the last row as a DataFrame
 
-                print("📈 Latest Stock Data:")
-                print(latest_data)
+                # Get the latest row
+                latest_data = stock_data.iloc[-1].fillna(0).to_dict()
 
-                # **Ensure fillna() is applied BEFORE converting to dict**
-                latest_data_clean = latest_data.fillna(0)  # Ensure no NaN values
-
-                # Convert DataFrame row to a dictionary for Zapier
-                json_payload = latest_data_clean.reset_index().to_dict(orient="records")[0]  # Convert to dict
-
-                # Debugging Step: Ensure json_payload is a dictionary and does NOT contain fillna()
                 print("✅ Final JSON Payload for Zapier:")
-                print(json_payload)
+                print(json.dumps(latest_data, indent=2))
 
                 # Send to Zapier
-                send_to_zapier(json_payload)  # This must accept a dictionary, not a DataFrame!
+                send_to_zapier(latest_data)
 
         else:
             print("❌ No valid stock data retrieved. Skipping Zapier request.")
 
         print("⏳ Waiting 10 minutes for next check...\n")
         time.sleep(600)  # Wait 10 minutes before the next check
+
 
 if __name__ == "__main__":
     main()
