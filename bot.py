@@ -131,6 +131,21 @@ def calculate_indicators(stock):
         print(f"❌ Error calculating indicators: {e}")
         return None
 
+def send_to_zapier(data):
+    """Send stock data to Zapier webhook."""
+    if not ZAPIER_WEBHOOK_URL:
+        print("❌ Error: Zapier Webhook URL is not set.")
+        return
+
+    try:
+        response = requests.post(ZAPIER_WEBHOOK_URL, json=data)
+        if response.status_code == 200:
+            print("✅ Data sent to Zapier successfully!")
+        else:
+            print("❌ Failed to send data to Zapier. Response:", response.text)
+    except Exception as e:
+        print(f"❌ Error sending data to Zapier: {e}")
+
 # ✅ **Main Loop**
 def main():
     """Main loop to run every 5 minutes."""
