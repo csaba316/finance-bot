@@ -111,6 +111,20 @@ def analyze_with_chatgpt(data):
     except Exception as e:
         print(f"❌ Error querying OpenAI: {e}")
         return "HOLD"
+
+# ✅ Log Trade Actions
+def log_trade(symbol, action, quantity, price, reason):
+    trade_data = {
+        "Date": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "Symbol": symbol,
+        "Action": action,
+        "Quantity": quantity,
+        "Price": price,
+        "Reason": reason
+    }
+    df = pd.DataFrame([trade_data])
+    df.to_csv(TRADE_LOG_FILE, mode='a', header=not os.path.exists(TRADE_LOG_FILE), index=False)
+    print(f"📜 Trade logged: {trade_data}")
         
 # ✅ Execute Trade (Only if Market is Open)
 def execute_trade(symbol, decision, price):
