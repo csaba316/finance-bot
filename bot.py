@@ -19,7 +19,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 alpaca = REST(ALPACA_API_KEY, ALPACA_SECRET_KEY, ALPACA_BASE_URL)
 
 # Assets to Monitor
-ASSETS = ["NVDA", "AAPL", "TSLA", "MSFT", "GOOGL", "BTC/USD", "ETH/USD"]
+ASSETS = ["NVDA", "AAPL", "TSLA", "MSFT", "GOOGL", "BTC-USD", "ETH-USD"]
 
 # Position Sizing Parameters
 CAPITAL_ALLOCATION = 0.05  # Allocate 5% of capital per trade
@@ -48,7 +48,10 @@ def calculate_rsi(data, window=14):
 # ✅ Fetch Stock & Crypto Data
 def fetch_asset_data(symbol):
     try:
-        stock = yf.download(symbol, period="7d", interval="5m", auto_adjust=False, prepost=True)
+        # Adjust symbol for Yahoo Finance
+        yf_symbol = symbol.replace("/", "-")  # Convert "BTC/USD" → "BTC-USD"
+        
+        stock = yf.download(yf_symbol, period="7d", interval="5m", auto_adjust=False, prepost=True)
         if stock.empty:
             raise ValueError(f"❌ No data for {symbol}")
 
