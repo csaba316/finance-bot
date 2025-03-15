@@ -111,7 +111,35 @@ def analyze_with_chatgpt(data):
     except Exception as e:
         print(f"❌ Error querying OpenAI: {e}")
         return "HOLD"
+        
+# ✅ Execute Trade (Only if Market is Open)
+def execute_trade(symbol, decision, price):
+    try:
+        clock = alpaca.get_clock()
+        if symbol not in ["BTC-USD", "ETH-USD"] and not clock.is_open:
+            print(f"⏸️ Market is closed. Logging trade for {symbol}.")
+            log_trade(symbol, "SKIPPED", 0, price, "Market Closed")
+            return
+        
+        account = alpaca.get_account()
+        buying_power = float(account.buying_power)
+        trade_amount = buying_power * CAPITAL_ALLOCATION  # 5% allocation
+        quantity = int(trade_amount / price)
 
+        if "BUY" in decision and quantity > 0:
+            alpaca.submit_order(symbol=symbol, qty=quantity, side="buy", type="market", time_in_force="gtc")
+            print(f"✅ Bought {quantity} shares of {symbol}")
+            log_trade(symbol, "BUY", quantity, price, decision)
+        elif "SELL" in decision:
+            alpaca.submit_order(symbol=symbol, qty=quantity, side="sell", type="market", time_in_force="gtc")
+            print(f"✅ Sold {quantity} shares of {symbol}")
+            log_trade(symbol, "SELL", quantity, price, decision)
+        else:
+            print(f"⏸️ Holding position for {symbol}")
+            log_trade(symbol, "HOLD", 0, price, decision)
+    except Exception as e:
+        print(f"❌ Error executing trade for {symbol}: {e}")
+        
 # ✅ Main Loop
 def main():
     while True:
