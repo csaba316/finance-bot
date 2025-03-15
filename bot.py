@@ -19,7 +19,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 alpaca = REST(ALPACA_API_KEY, ALPACA_SECRET_KEY, ALPACA_BASE_URL)
 
 # Assets to Monitor
-ASSETS = ["NVDA", "AAPL", "TSLA", "BTC-USD", "ETH-USD"]
+ASSETS = ["NVDA", "AAPL", "TSLA", "MSFT", "GOOGL", "BTC/USD", "ETH/USD"]
 
 # Position Sizing Parameters
 CAPITAL_ALLOCATION = 0.05  # Allocate 5% of capital per trade
@@ -57,6 +57,7 @@ def fetch_asset_data(symbol):
     except Exception as e:
         print(f"❌ Error fetching data for {symbol}: {e}")
         return None
+
 
 # ✅ Calculate Indicators
 def calculate_indicators(stock):
@@ -126,27 +127,27 @@ def log_trade(symbol, action, quantity, price, reason):
     df.to_csv(TRADE_LOG_FILE, mode='a', header=not os.path.exists(TRADE_LOG_FILE), index=False)
     print(f"📜 Trade logged: {trade_data}")
         
-# ✅ Execute Trade (Only if Market is Open)
+# ✅ Execute Trade
 def execute_trade(symbol, decision, price):
     try:
         clock = alpaca.get_clock()
-        if symbol not in ["BTC-USD", "ETH-USD"] and not clock.is_open:
+        if symbol not in ["BTC/USD", "ETH/USD"] and not clock.is_open:
             print(f"⏸️ Market is closed. Logging trade for {symbol}.")
             log_trade(symbol, "SKIPPED", 0, price, "Market Closed")
             return
         
         account = alpaca.get_account()
         buying_power = float(account.buying_power)
-        trade_amount = buying_power * CAPITAL_ALLOCATION  # 5% allocation
-        quantity = int(trade_amount / price)
+        trade_amount = buying_power * CAPITAL_ALLOCATION
+        quantity = round(trade_amount / price, 6)
 
         if "BUY" in decision and quantity > 0:
             alpaca.submit_order(symbol=symbol, qty=quantity, side="buy", type="market", time_in_force="gtc")
-            print(f"✅ Bought {quantity} shares of {symbol}")
+            print(f"✅ Bought {quantity} of {symbol}")
             log_trade(symbol, "BUY", quantity, price, decision)
         elif "SELL" in decision:
             alpaca.submit_order(symbol=symbol, qty=quantity, side="sell", type="market", time_in_force="gtc")
-            print(f"✅ Sold {quantity} shares of {symbol}")
+            print(f"✅ Sold {quantity} of {symbol}")
             log_trade(symbol, "SELL", quantity, price, decision)
         else:
             print(f"⏸️ Holding position for {symbol}")
@@ -167,7 +168,7 @@ def main():
                 trade_decision = analyze_with_chatgpt(latest_data)
                 print(f"📈 {asset} Decision: {trade_decision}")
                 execute_trade(asset, trade_decision, price)
-
+        
         print("⏳ Waiting 5 minutes before next check...")
         time.sleep(300)
 
