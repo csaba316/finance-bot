@@ -158,7 +158,13 @@ def main():
 
                 trade_decision = analyze_with_chatgpt(latest_data)
                 print(f"📈 {asset} Decision: {trade_decision}")
-                execute_trade(asset, trade_decision, price)
+                if "BUY" in trade_decision:
+                execute_trade(asset, "BUY", price)
+                elif "SELL" in trade_decision:
+                execute_trade(asset, "SELL", price)
+                else:
+                print(f"⏸️ Holding position for {asset}")
+                log_trade(asset, "HOLD", 0, price, "ChatGPT Decision")
 
         print("⏳ Waiting 5 minutes before next check...")
         time.sleep(300)
