@@ -68,8 +68,9 @@ def calculate_indicators(stock):
 
         # Bollinger Bands
         stock['Middle_Band'] = stock['Close'].rolling(window=20).mean()
-        stock['Upper_Band'] = stock['Middle_Band'] + (stock['Close'].rolling(window=20).std() * 2)
-        stock['Lower_Band'] = stock['Middle_Band'] - (stock['Close'].rolling(window=20).std() * 2)
+        stock['Std_Dev'] = stock['Close'].rolling(window=20).std()
+        stock['Upper_Band'] = stock['Middle_Band'] + (stock['Std_Dev'] * 2)
+        stock['Lower_Band'] = stock['Middle_Band'] - (stock['Std_Dev'] * 2)
 
         # ATR Calculation
         stock['High-Low'] = stock['High'] - stock['Low']
