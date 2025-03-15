@@ -21,6 +21,11 @@ alpaca = REST(ALPACA_API_KEY, ALPACA_SECRET_KEY, ALPACA_BASE_URL)
 # Assets to Monitor
 ASSETS = ["NVDA", "AAPL", "TSLA", "BTC-USD", "ETH-USD"]
 
+# Position Sizing Parameters
+CAPITAL_ALLOCATION = 0.05  # Allocate 5% of capital per trade
+STOP_LOSS_PERCENT = 0.02  # 2% stop-loss
+TAKE_PROFIT_PERCENT = 0.05  # 5% take-profit
+
 # ✅ Calculate RSI
 def calculate_rsi(data, window=14):
     if 'Close' not in data.columns or len(data) < window:
@@ -41,55 +46,11 @@ def calculate_rsi(data, window=14):
     print("✅ RSI Calculated: ", rsi.tail())
     return rsi.fillna(0)
 
-# ✅ Fetch Stock & Crypto Data
-def fetch_asset_data(symbol):
-    try:
-        stock = yf.download(symbol, period="7d", interval="5m", auto_adjust=False, prepost=True)
-        if stock.empty:
-            raise ValueError(f"❌ No data for {symbol}")
-        
-        stock = calculate_indicators(stock)
-        return stock
-    except Exception as e:
-        print(f"❌ Error fetching data for {symbol}: {e}")
-        return None
-
-# ✅ Calculate Indicators
-def calculate_indicators(stock):
-    try:
-        stock['RSI'] = calculate_rsi(stock)
-
-        if stock['RSI'].isna().all():
-            print("⚠️ Warning: RSI is completely NaN for this asset.")
-
-        stock['SMA_50'] = stock['Close'].rolling(window=50).mean()
-        stock['SMA_200'] = stock['Close'].rolling(window=200).mean()
-
-        exp12 = stock['Close'].ewm(span=12, adjust=False).mean()
-        exp26 = stock['Close'].ewm(span=26, adjust=False).mean()
-        stock['MACD'] = exp12 - exp26
-        stock['MACD_Signal'] = stock['MACD'].ewm(span=9, adjust=False).mean()
-
-        stock['Middle_Band'] = stock['Close'].rolling(window=20).mean()
-        stock['Std_Dev'] = stock['Close'].rolling(window=20).std()
-        stock['Upper_Band'] = stock['Middle_Band'] + (stock['Std_Dev'] * 2)
-        stock['Lower_Band'] = stock['Middle_Band'] - (stock['Std_Dev'] * 2)
-
-        stock['High-Low'] = stock['High'] - stock['Low']
-        stock['High-Close'] = abs(stock['High'] - stock['Close'].shift())
-        stock['Low-Close'] = abs(stock['Low'] - stock['Close'].shift())
-        stock['True_Range'] = stock[['High-Low', 'High-Close', 'Low-Close']].max(axis=1)
-        stock['ATR'] = stock['True_Range'].rolling(window=14).mean()
-
-        return stock.fillna(0)
-    except Exception as e:
-        print(f"❌ Error calculating indicators: {e}")
-        return None
-
 # ✅ Query ChatGPT for Trade Decisions
 def analyze_with_chatgpt(data):
     prompt = f"""
-    Given the following stock indicators:
+    You are a professional stock and crypto trader providing concise trading recommendations.
+    Based on these indicators:
     - RSI: {data.get('RSI', 'N/A')}
     - SMA 50: {data.get('SMA_50', 'N/A')}
     - SMA 200: {data.get('SMA_200', 'N/A')}
@@ -98,7 +59,8 @@ def analyze_with_chatgpt(data):
     - Bollinger Upper: {data.get('Upper_Band', 'N/A')}
     - Bollinger Lower: {data.get('Lower_Band', 'N/A')}
     - ATR: {data.get('ATR', 'N/A')}
-    Should I BUY, SELL, or HOLD?
+    
+    Give a concise recommendation: BUY, SELL, or HOLD, with a short reason.
     """
     try:
         response = client.chat.completions.create(
@@ -113,16 +75,37 @@ def analyze_with_chatgpt(data):
         print(f"❌ Error querying OpenAI: {e}")
         return "HOLD"
 
-# ✅ Execute Trade on Alpaca
+# ✅ Execute Trade with Position Sizing
 def execute_trade(symbol, decision):
-    if decision == "BUY":
-        alpaca.submit_order(symbol=symbol, qty=1, side="buy", type="market", time_in_force="gtc")
-        print(f"✅ Bought 1 share of {symbol}")
-    elif decision == "SELL":
-        alpaca.submit_order(symbol=symbol, qty=1, side="sell", type="market", time_in_force="gtc")
-        print(f"✅ Sold 1 share of {symbol}")
-    else:
-        print(f"⏸️ Holding position for {symbol}")
+    try:
+        account = alpaca.get_account()
+        buying_power = float(account.buying_power)
+        trade_amount = buying_power * CAPITAL_ALLOCATION  # 5% allocation
+        last_price = float(yf.Ticker(symbol).history(period="1d").iloc[-1]['Close'])
+        quantity = int(trade_amount / last_price)
+
+        if decision == "BUY" and quantity > 0:
+            alpaca.submit_order(
+                symbol=symbol,
+                qty=quantity,
+                side="buy",
+                type="market",
+                time_in_force="gtc"
+            )
+            print(f"✅ Bought {quantity} shares of {symbol}")
+        elif decision == "SELL":
+            alpaca.submit_order(
+                symbol=symbol,
+                qty=quantity,
+                side="sell",
+                type="market",
+                time_in_force="gtc"
+            )
+            print(f"✅ Sold {quantity} shares of {symbol}")
+        else:
+            print(f"⏸️ Holding position for {symbol}")
+    except Exception as e:
+        print(f"❌ Error executing trade for {symbol}: {e}")
 
 # ✅ Main Loop
 def main():
@@ -137,7 +120,7 @@ def main():
                 # Ensure all indicators are explicitly included
                 indicators = ["RSI", "SMA_50", "SMA_200", "MACD", "MACD_Signal", "Upper_Band", "Lower_Band", "ATR"]
                 for ind in indicators:
-                    if ind not in latest_data or (pd.isna(latest_data.get(ind, "N/A"))).any():
+                    if ind not in latest_data or (pd.isna(latest_data.get(ind, "N/A"))):
                         print(f"⚠️ Warning: {ind} missing for {asset}, setting default value.")
                         latest_data[ind] = "N/A"
 
