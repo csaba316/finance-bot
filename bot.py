@@ -33,32 +33,28 @@ def calculate_rsi(data, window=14):
 
     avg_gain = gain.ewm(span=window, adjust=False).mean()
     avg_loss = loss.ewm(span=window, adjust=False).mean()
-
-    avg_loss.replace(0, 1e-10, inplace=True)  # Prevent division by zero
+    
+    avg_loss.replace(0, 1e-10, inplace=True)
     rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
 
-    # Debug: Print last few RSI values
-    print("✅ RSI Calculated: \n", rsi.tail())
-
-    return rsi.fillna(0)  # Ensure NaN values are replaced
+    print("✅ RSI Calculated: ", rsi.tail())
+    return rsi.fillna(0)
 
 # ✅ Fetch Stock & Crypto Data
 def fetch_asset_data(symbol):
-    """Fetch stock/crypto data and compute indicators."""
     try:
         stock = yf.download(symbol, period="7d", interval="5m", auto_adjust=False, prepost=True)
         if stock.empty:
             raise ValueError(f"❌ No data for {symbol}")
         
         stock = calculate_indicators(stock)
-        
         return stock
     except Exception as e:
         print(f"❌ Error fetching data for {symbol}: {e}")
         return None
 
-# ✅ Calculate RSI, MACD, Bollinger Bands, ATR
+# ✅ Calculate Indicators
 def calculate_indicators(stock):
     try:
         stock['RSI'] = calculate_rsi(stock)
@@ -85,24 +81,23 @@ def calculate_indicators(stock):
         stock['True_Range'] = stock[['High-Low', 'High-Close', 'Low-Close']].max(axis=1)
         stock['ATR'] = stock['True_Range'].rolling(window=14).mean()
 
-        return stock.fillna(0)  # Ensure no missing values
+        return stock.fillna(0)
     except Exception as e:
         print(f"❌ Error calculating indicators: {e}")
         return None
-        
+
 # ✅ Query ChatGPT for Trade Decisions
 def analyze_with_chatgpt(data):
-    """Send market indicators to ChatGPT for analysis."""
     prompt = f"""
     Given the following stock indicators:
-    - RSI: {data['RSI']}
-    - SMA 50: {data['SMA_50']}
-    - SMA 200: {data['SMA_200']}
-    - MACD: {data['MACD']}
-    - MACD Signal: {data['MACD_Signal']}
-    - Bollinger Upper: {data['Upper_Band']}
-    - Bollinger Lower: {data['Lower_Band']}
-    - ATR: {data['ATR']}
+    - RSI: {data.get('RSI', 'N/A')}
+    - SMA 50: {data.get('SMA_50', 'N/A')}
+    - SMA 200: {data.get('SMA_200', 'N/A')}
+    - MACD: {data.get('MACD', 'N/A')}
+    - MACD Signal: {data.get('MACD_Signal', 'N/A')}
+    - Bollinger Upper: {data.get('Upper_Band', 'N/A')}
+    - Bollinger Lower: {data.get('Lower_Band', 'N/A')}
+    - ATR: {data.get('ATR', 'N/A')}
     Should I BUY, SELL, or HOLD?
     """
     response = client.completions.create(model="gpt-4", messages=[{"role": "user", "content": prompt}])
@@ -110,7 +105,6 @@ def analyze_with_chatgpt(data):
 
 # ✅ Execute Trade on Alpaca
 def execute_trade(symbol, decision):
-    """Place a trade order based on ChatGPT's decision."""
     if decision == "BUY":
         alpaca.submit_order(symbol=symbol, qty=1, side="buy", type="market", time_in_force="gtc")
         print(f"✅ Bought 1 share of {symbol}")
