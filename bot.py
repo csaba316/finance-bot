@@ -185,8 +185,28 @@ def main():
     while True:
         for asset in ASSETS:
             print(f"📊 Fetching data for {asset}...")
-            price = fetch_crypto_data(asset) if "USD" in asset else fetch_asset_data(asset).iloc[-1].get('Close', 0)
-            trade_decision = analyze_with_chatgpt({})
+            price = 0
+
+            if asset in ["BTC-USD", "ETH-USD"]:
+                price = fetch_crypto_data(asset)
+                if price:
+                    print(f"💰 {asset} Price: ${price}")
+                else:
+                    print(f"❌ Failed to fetch price for {asset}")
+                    continue
+            else:
+                stock_data = fetch_asset_data(asset)
+                if stock_data is None or stock_data.empty:
+                    print(f"❌ No valid data for {asset}. Skipping...")
+                    continue
+                
+                latest_data = stock_data.iloc[-1].to_dict()
+                price = latest_data.get('Close', 0)
+                if price == 0:
+                    print(f"❌ Price data unavailable for {asset}")
+                    continue
+
+            trade_decision = analyze_with_chatgpt(latest_data)
             print(f"📈 {asset} Decision: {trade_decision}")
             execute_trade(asset, trade_decision, price)
 
