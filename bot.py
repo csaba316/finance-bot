@@ -34,18 +34,29 @@ TRADE_LOG_FILE = "trade_log.csv"
 # ✅ Fetch Stock Data with Improved Handling
 def fetch_asset_data(symbol):
     try:
-        interval = "5m" if alpaca.get_clock().is_open else "30m"
+        clock = alpaca.get_clock()
+        interval = "5m" if clock.is_open else "30m"
+
+        # Attempt fetching intraday data
         stock = yf.download(symbol, period="7d", interval=interval, auto_adjust=True, prepost=True)
 
-        # ✅ Ensure DataFrame is not empty
+        # ✅ Debug: Print fetched data
+        if stock.empty:
+            print(f"⚠️ No data for {symbol} using interval {interval}. Trying daily data...")
+            stock = yf.download(symbol, period="30d", interval="1d", auto_adjust=True)
+        
         if stock.empty:
             raise ValueError(f"❌ No valid stock data for {symbol} (empty DataFrame)")
 
-        # ✅ Check if 'Close' column exists and contains valid prices
-        if 'Close' not in stock.columns or stock['Close'].isna().all().item():
-            raise ValueError(f"❌ No valid stock data for {symbol} (missing 'Close' prices)")
+        # ✅ Ensure 'Close' column exists and has valid values
+        if 'Close' not in stock.columns:
+            raise ValueError(f"❌ 'Close' price missing for {symbol} (columns: {stock.columns.tolist()})")
 
-        stock = stock.ffill().dropna()  # Forward-fill missing values and remove NaNs
+        # ✅ Debug: Print last few rows of stock data
+        print(f"📊 {symbol} data preview:\n{stock.tail(3)}")
+
+        # Forward-fill missing values and calculate indicators
+        stock = stock.ffill().dropna()
         stock = calculate_indicators(stock)
         return stock
 
