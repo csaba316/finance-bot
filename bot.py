@@ -141,13 +141,14 @@ def main():
                         print(f"⚠️ Warning: {ind} missing for {asset}, setting default value.")
                         latest_data[ind] = "N/A"
 
+                # Convert Series to Dictionary
                 latest_data = latest_data.to_dict()
 
-                # Debugging: Check latest_data before sending it to ChatGPT
-                print(f"🔍 Debug latest_data for {asset}: {latest_data}")
+                # Flatten MultiIndex columns if they exist
+                latest_data = {key[0] if isinstance(key, tuple) else key: value for key, value in latest_data.items()}
 
-                if "RSI" not in latest_data:
-                    print(f"⚠️ Warning: RSI missing from latest_data for {asset}. Debug info: \n", data.tail())
+                # Debugging: Check latest_data after cleaning
+                print(f"🔍 Fixed latest_data for {asset}: {latest_data}")
 
                 trade_decision = analyze_with_chatgpt(latest_data)
                 print(f"📈 {asset} Decision: {trade_decision}")
