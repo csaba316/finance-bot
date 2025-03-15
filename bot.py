@@ -41,8 +41,8 @@ def fetch_asset_data(symbol):
         if stock.empty:
             raise ValueError(f"❌ No valid stock data for {symbol} (empty DataFrame)")
 
-        # ✅ Check if 'Close' column exists and has valid values
-        if 'Close' not in stock.columns or stock['Close'].isna().all():
+        # ✅ Check if 'Close' column exists and contains valid prices
+        if 'Close' not in stock.columns or stock['Close'].isna().all().item():
             raise ValueError(f"❌ No valid stock data for {symbol} (missing 'Close' prices)")
 
         stock = stock.ffill().dropna()  # Forward-fill missing values and remove NaNs
@@ -67,13 +67,19 @@ def fetch_crypto_data(symbol, retries=3):
     for attempt in range(retries):
         try:
             response = requests.get(url, timeout=10).json()
-            if coin_id not in response or 'usd' not in response[coin_id]:
+
+            # ✅ Ensure valid response structure
+            if not isinstance(response, dict) or coin_id not in response or 'usd' not in response.get(coin_id, {}):
                 raise ValueError(f"❌ No crypto data for {symbol}")
+
             return response[coin_id]['usd']
+
         except Exception as e:
             print(f"❌ Attempt {attempt+1} error fetching crypto data for {symbol}: {e}")
             time.sleep(2)
-    return None
+    
+    return None  # Return None if all attempts fail
+
         
 # ✅ Calculate RSI
 def calculate_rsi(data, window=14):
