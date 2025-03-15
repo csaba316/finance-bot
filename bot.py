@@ -137,8 +137,8 @@ def main():
                 # Ensure all indicators are explicitly included
                 indicators = ["RSI", "SMA_50", "SMA_200", "MACD", "MACD_Signal", "Upper_Band", "Lower_Band", "ATR"]
                 for ind in indicators:
-                if ind not in latest_data or pd.isna(latest_data.get(ind, "N/A")).any():                        
-                    print(f"⚠️ Warning: {ind} missing for {asset}, setting default value.")
+                    if ind not in latest_data or pd.isna(latest_data.get(ind, "N/A")):
+                        print(f"⚠️ Warning: {ind} missing for {asset}, setting default value.")
                         latest_data[ind] = "N/A"
 
                 latest_data = latest_data.to_dict()
