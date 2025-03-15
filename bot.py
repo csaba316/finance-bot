@@ -89,13 +89,15 @@ def calculate_indicators(stock):
 # ✅ Query ChatGPT for Trade Decisions
 def analyze_with_chatgpt(data):
     prompt = f"""
-    You are a professional stock and crypto trader providing concise recommendations.
-    Given:
+    You are a professional stock and crypto trader providing concise trade signals.
+    Given these indicators:
     RSI: {data.get('RSI', 'N/A')}, SMA50: {data.get('SMA_50', 'N/A')}, SMA200: {data.get('SMA_200', 'N/A')},
     MACD: {data.get('MACD', 'N/A')}, MACD Signal: {data.get('MACD_Signal', 'N/A')}, ATR: {data.get('ATR', 'N/A')},
     Upper Band: {data.get('Upper_Band', 'N/A')}, Lower Band: {data.get('Lower_Band', 'N/A')}.
-
-    Recommend: BUY, SELL, or HOLD, with a 1-sentence reason.
+    
+    Provide a decision: BUY, SELL, or HOLD.
+    Format response strictly as:
+    "DECISION: [BUY/SELL/HOLD]. REASON: [SHORT REASON]"
     """
     try:
         response = client.chat.completions.create(
@@ -110,47 +112,6 @@ def analyze_with_chatgpt(data):
         print(f"❌ Error querying OpenAI: {e}")
         return "HOLD"
 
-# ✅ Trade Logging
-def log_trade(symbol, action, quantity, price, reason):
-    trade_data = {
-        "Date": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "Symbol": symbol,
-        "Action": action,
-        "Quantity": quantity,
-        "Price": price,
-        "Reason": reason
-    }
-    df = pd.DataFrame([trade_data])
-    df.to_csv(TRADE_LOG_FILE, mode='a', header=not os.path.exists(TRADE_LOG_FILE), index=False)
-
-# ✅ Execute Trade (Only if Market is Open)
-def execute_trade(symbol, decision, price):
-    try:
-        clock = alpaca.get_clock()
-        if not clock.is_open:
-            print(f"⏸️ Market is closed. Skipping trade for {symbol}.")
-            log_trade(symbol, "SKIPPED", 0, price, "Market Closed")
-            return
-        
-        account = alpaca.get_account()
-        buying_power = float(account.buying_power)
-        trade_amount = buying_power * CAPITAL_ALLOCATION  # 5% allocation
-        quantity = int(trade_amount / price)
-
-        if decision == "BUY" and quantity > 0:
-            alpaca.submit_order(symbol=symbol, qty=quantity, side="buy", type="market", time_in_force="gtc")
-            print(f"✅ Bought {quantity} shares of {symbol}")
-            log_trade(symbol, "BUY", quantity, price, "ChatGPT Decision")
-        elif decision == "SELL":
-            alpaca.submit_order(symbol=symbol, qty=quantity, side="sell", type="market", time_in_force="gtc")
-            print(f"✅ Sold {quantity} shares of {symbol}")
-            log_trade(symbol, "SELL", quantity, price, "ChatGPT Decision")
-        else:
-            print(f"⏸️ Holding position for {symbol}")
-            log_trade(symbol, "HOLD", 0, price, "ChatGPT Decision")
-    except Exception as e:
-        print(f"❌ Error executing trade for {symbol}: {e}")
-
 # ✅ Main Loop
 def main():
     while True:
@@ -161,7 +122,6 @@ def main():
                 latest_data = data.iloc[-1].copy().to_dict()
                 latest_data = {key[0] if isinstance(key, tuple) else key: value for key, value in latest_data.items()}
                 price = latest_data.get('Close', 0)
-
                 trade_decision = analyze_with_chatgpt(latest_data)
                 print(f"📈 {asset} Decision: {trade_decision}")
                 execute_trade(asset, trade_decision, price)
