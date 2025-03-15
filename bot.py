@@ -130,27 +130,29 @@ def main():
         for asset in ASSETS:
             print(f"📊 Fetching data for {asset}...")
             data = fetch_asset_data(asset)
-            
+
             if data is not None:
-               latest_data = data.iloc[-1].copy()
+                latest_data = data.iloc[-1].copy()
 
-            # Ensure all indicators are explicitly included
-            indicators = ["RSI", "SMA_50", "SMA_200", "MACD", "MACD_Signal", "Upper_Band", "Lower_Band", "ATR"]
-            for ind in indicators:
-            if ind not in latest_data or pd.isna(latest_data[ind]):
-            print(f"⚠️ Warning: {ind} missing for {asset}, setting default value.")
-            latest_data[ind] = "N/A"
+                # Ensure all indicators are explicitly included
+                indicators = ["RSI", "SMA_50", "SMA_200", "MACD", "MACD_Signal", "Upper_Band", "Lower_Band", "ATR"]
+                for ind in indicators:
+                    if ind not in latest_data or pd.isna(latest_data[ind]):
+                        print(f"⚠️ Warning: {ind} missing for {asset}, setting default value.")
+                        latest_data[ind] = "N/A"
 
-            latest_data = latest_data.to_dict()
+                latest_data = latest_data.to_dict()
 
-            # Debugging: Check latest_data before sending it to ChatGPT
-            print(f"🔍 Debug latest_data for {asset}: {latest_data}")
+                # Debugging: Check latest_data before sending it to ChatGPT
+                print(f"🔍 Debug latest_data for {asset}: {latest_data}")
+
                 if "RSI" not in latest_data:
                     print(f"⚠️ Warning: RSI missing from latest_data for {asset}. Debug info: \n", data.tail())
+
                 trade_decision = analyze_with_chatgpt(latest_data)
                 print(f"📈 {asset} Decision: {trade_decision}")
                 execute_trade(asset, trade_decision)
-        
+
         print("⏳ Waiting 5 minutes before next check...")
         time.sleep(300)
 
