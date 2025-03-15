@@ -123,9 +123,15 @@ def log_trade(symbol, action, quantity, price, reason):
     df = pd.DataFrame([trade_data])
     df.to_csv(TRADE_LOG_FILE, mode='a', header=not os.path.exists(TRADE_LOG_FILE), index=False)
 
-# ✅ Execute Trade
+# ✅ Execute Trade (Only if Market is Open)
 def execute_trade(symbol, decision, price):
     try:
+        clock = alpaca.get_clock()
+        if not clock.is_open:
+            print(f"⏸️ Market is closed. Skipping trade for {symbol}.")
+            log_trade(symbol, "SKIPPED", 0, price, "Market Closed")
+            return
+        
         account = alpaca.get_account()
         buying_power = float(account.buying_power)
         trade_amount = buying_power * CAPITAL_ALLOCATION  # 5% allocation
@@ -158,13 +164,7 @@ def main():
 
                 trade_decision = analyze_with_chatgpt(latest_data)
                 print(f"📈 {asset} Decision: {trade_decision}")
-                if "BUY" in trade_decision:
-                execute_trade(asset, "BUY", price)
-                elif "SELL" in trade_decision:
-                execute_trade(asset, "SELL", price)
-                else:
-                print(f"⏸️ Holding position for {asset}")
-                log_trade(asset, "HOLD", 0, price, "ChatGPT Decision")
+                execute_trade(asset, trade_decision, price)
 
         print("⏳ Waiting 5 minutes before next check...")
         time.sleep(300)
