@@ -86,31 +86,33 @@ def calculate_indicators(stock):
         print(f"❌ Error calculating indicators: {e}")
         return None
 
-# ✅ Query ChatGPT for Trade Decisions
-def analyze_with_chatgpt(data):
-    prompt = f"""
-    You are a professional stock and crypto trader providing concise trade signals.
-    Given these indicators:
-    RSI: {data.get('RSI', 'N/A')}, SMA50: {data.get('SMA_50', 'N/A')}, SMA200: {data.get('SMA_200', 'N/A')},
-    MACD: {data.get('MACD', 'N/A')}, MACD Signal: {data.get('MACD_Signal', 'N/A')}, ATR: {data.get('ATR', 'N/A')},
-    Upper Band: {data.get('Upper_Band', 'N/A')}, Lower Band: {data.get('Lower_Band', 'N/A')}.
-    
-    Provide a decision: BUY, SELL, or HOLD.
-    Format response strictly as:
-    "DECISION: [BUY/SELL/HOLD]. REASON: [SHORT REASON]"
-    """
+# ✅ Execute Trade (Only if Market is Open)
+def execute_trade(symbol, decision, price):
     try:
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are a world expert at stock and crypto trading."},
-                {"role": "assistant", "name": "zapier", "content": prompt}
-            ]
-        )
-        return response.choices[0].message.content.strip().upper()
+        clock = alpaca.get_clock()
+        if symbol not in ["BTC-USD", "ETH-USD"] and not clock.is_open:
+            print(f"⏸️ Market is closed. Logging trade for {symbol}.")
+            log_trade(symbol, "SKIPPED", 0, price, "Market Closed")
+            return
+        
+        account = alpaca.get_account()
+        buying_power = float(account.buying_power)
+        trade_amount = buying_power * CAPITAL_ALLOCATION  # 5% allocation
+        quantity = int(trade_amount / price)
+
+        if "BUY" in decision and quantity > 0:
+            alpaca.submit_order(symbol=symbol, qty=quantity, side="buy", type="market", time_in_force="gtc")
+            print(f"✅ Bought {quantity} shares of {symbol}")
+            log_trade(symbol, "BUY", quantity, price, decision)
+        elif "SELL" in decision:
+            alpaca.submit_order(symbol=symbol, qty=quantity, side="sell", type="market", time_in_force="gtc")
+            print(f"✅ Sold {quantity} shares of {symbol}")
+            log_trade(symbol, "SELL", quantity, price, decision)
+        else:
+            print(f"⏸️ Holding position for {symbol}")
+            log_trade(symbol, "HOLD", 0, price, decision)
     except Exception as e:
-        print(f"❌ Error querying OpenAI: {e}")
-        return "HOLD"
+        print(f"❌ Error executing trade for {symbol}: {e}")
 
 # ✅ Main Loop
 def main():
