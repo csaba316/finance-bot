@@ -26,6 +26,20 @@ CAPITAL_ALLOCATION = 0.05  # Allocate 5% of capital per trade
 STOP_LOSS_PERCENT = 0.02  # 2% stop-loss
 TAKE_PROFIT_PERCENT = 0.05  # 5% take-profit
 
+# ✅ Fetch Stock & Crypto Data
+def fetch_asset_data(symbol):
+    """Fetch stock/crypto data and compute indicators."""
+    try:
+        stock = yf.download(symbol, period="7d", interval="5m", auto_adjust=False, prepost=True)
+        if stock.empty:
+            raise ValueError(f"❌ No data for {symbol}")
+
+        stock = calculate_indicators(stock)
+        return stock
+    except Exception as e:
+        print(f"❌ Error fetching data for {symbol}: {e}")
+        return None
+        
 # ✅ Calculate RSI
 def calculate_rsi(data, window=14):
     if 'Close' not in data.columns or len(data) < window:
