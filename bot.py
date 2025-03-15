@@ -37,17 +37,22 @@ def fetch_asset_data(symbol):
         interval = "5m" if alpaca.get_clock().is_open else "30m"
         stock = yf.download(symbol, period="7d", interval=interval, auto_adjust=True, prepost=True)
 
-        # ✅ FIX: Properly handle the boolean condition
-        if stock.empty or (stock['Close'].isna().all()):
-            raise ValueError(f"❌ No valid stock data for {symbol}")
+        # ✅ Ensure DataFrame is not empty
+        if stock.empty:
+            raise ValueError(f"❌ No valid stock data for {symbol} (empty DataFrame)")
 
-        stock = stock.ffill().dropna()
+        # ✅ Check if 'Close' column exists and has valid values
+        if 'Close' not in stock.columns or stock['Close'].isna().all():
+            raise ValueError(f"❌ No valid stock data for {symbol} (missing 'Close' prices)")
+
+        stock = stock.ffill().dropna()  # Forward-fill missing values and remove NaNs
         stock = calculate_indicators(stock)
         return stock
+
     except Exception as e:
         print(f"❌ Error fetching data for {symbol}: {e}")
         return None
-        
+
 # ✅ Improved Crypto Data Retrieval
 def fetch_crypto_data(symbol, retries=3):
     coin_map = {"BTC-USD": "bitcoin", "ETH-USD": "ethereum"}
