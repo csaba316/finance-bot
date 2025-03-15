@@ -31,6 +31,41 @@ STOP_LOSS_PERCENT = 0.02  # 2% stop-loss
 TAKE_PROFIT_PERCENT = 0.05  # 5% take-profit
 TRADE_LOG_FILE = "trade_log.csv"
 
+# ✅ Fetch Stock Data with Improved Handling
+def fetch_asset_data(symbol):
+    try:
+        interval = "5m" if alpaca.get_clock().is_open else "30m"
+        stock = yf.download(symbol, period="7d", interval=interval, auto_adjust=True, prepost=True)
+
+        if stock.empty or stock['Close'].isna().all():
+            raise ValueError(f"❌ No valid stock data for {symbol}")
+
+        stock = stock.ffill().dropna()
+        stock = calculate_indicators(stock)
+        return stock
+    except Exception as e:
+        print(f"❌ Error fetching data for {symbol}: {e}")
+        return None
+
+# ✅ Improved Crypto Data Retrieval
+def fetch_crypto_data(symbol):
+    coin_map = {"BTC-USD": "bitcoin", "ETH-USD": "ethereum"}
+    coin_id = coin_map.get(symbol, None)
+
+    if not coin_id:
+        print(f"❌ Unsupported crypto symbol: {symbol}")
+        return None
+
+    url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd"
+    try:
+        response = requests.get(url).json()
+        if coin_id not in response:
+            raise ValueError(f"❌ No crypto data for {symbol}")
+        return response[coin_id]['usd']
+    except Exception as e:
+        print(f"❌ Error fetching crypto data for {symbol}: {e}")
+        return None
+        
 # ✅ Calculate RSI
 def calculate_rsi(data, window=14):
     if 'Close' not in data.columns or len(data) < window:
@@ -48,35 +83,6 @@ def calculate_rsi(data, window=14):
     rsi = 100 - (100 / (1 + rs))
 
     return rsi.fillna(0)
-
-# ✅ Fetch Stock & Crypto Data
-def fetch_asset_data(symbol):
-    try:
-        # Choose a different interval when market is closed
-        interval = "5m" if alpaca.get_clock().is_open else "30m"
-        stock = yf.download(symbol, period="7d", interval=interval, auto_adjust=False, prepost=True)
-        
-        if stock.empty:
-            raise ValueError(f"❌ No data for {symbol}")
-
-        stock = calculate_indicators(stock)
-        return stock
-    except Exception as e:
-        print(f"❌ Error fetching data for {symbol}: {e}")
-        return None
-
-# ✅ Fix Crypto Data Retrieval
-def fetch_crypto_data(symbol):
-    url = f"https://api.coingecko.com/api/v3/simple/price?ids={symbol.lower()}&vs_currencies=usd"
-    try:
-        response = requests.get(url).json()
-        if symbol.lower() not in response:
-            raise ValueError(f"❌ No crypto data for {symbol}")
-        return response[symbol.lower()]['usd']
-    except Exception as e:
-        print(f"❌ Error fetching crypto data for {symbol}: {e}")
-        return None
-
 
 # ✅ Calculate Indicators
 def calculate_indicators(stock):
@@ -102,6 +108,9 @@ def calculate_indicators(stock):
 
 # ✅ Query ChatGPT for Trade Decisions
 def analyze_with_chatgpt(data):
+    if not data or all(value == 0 or np.isnan(value) for value in data.values()):
+        return "DECISION: HOLD. REASON: NOT ENOUGH VALID MARKET DATA."
+
     prompt = f"""
     You are a professional stock and crypto trader providing concise trade signals.
     Given these indicators:
@@ -124,8 +133,8 @@ def analyze_with_chatgpt(data):
         return response.choices[0].message.content.strip().upper()
     except Exception as e:
         print(f"❌ Error querying OpenAI: {e}")
-        return "HOLD"
-
+        return "DECISION: HOLD. REASON: API ERROR."
+        
 # ✅ Log Trade Actions
 def log_trade(symbol, action, quantity, price, reason):
     trade_data = {
@@ -137,19 +146,18 @@ def log_trade(symbol, action, quantity, price, reason):
         "Reason": reason
     }
     df = pd.DataFrame([trade_data])
-    df.to_csv(TRADE_LOG_FILE, mode='a', header=not os.path.exists(TRADE_LOG_FILE), index=False)
+    df.to_csv("trade_log.csv", mode='a', header=not os.path.exists("trade_log.csv"), index=False)
     print(f"📜 Trade logged: {trade_data}")
 
-# ✅ Fix Trading Execution
+
+# ✅ Execute Trade
 def execute_trade(symbol, decision, price):
     try:
-        is_crypto = symbol in crypto_assets
-        if not is_crypto:
-            clock = alpaca.get_clock()
-            if not clock.is_open:
-                print(f"⏸️ Market is closed. Logging trade for {symbol}.")
-                log_trade(symbol, "SKIPPED", 0, price, "Market Closed")
-                return
+        clock = alpaca.get_clock()
+        if symbol not in ["BTC-USD", "ETH-USD"] and not clock.is_open:
+            print(f"⏸️ Market is closed. Logging trade for {symbol}.")
+            log_trade(symbol, "SKIPPED", 0, price, "Market Closed")
+            return
         
         account = alpaca.get_account()
         buying_power = float(account.buying_power)
@@ -172,31 +180,16 @@ def execute_trade(symbol, decision, price):
     except Exception as e:
         print(f"❌ Error executing trade for {symbol}: {e}")
 
-# ✅ Fix Main Loop
+# ✅ Main Loop
 def main():
     while True:
         for asset in ASSETS:
             print(f"📊 Fetching data for {asset}...")
-            if asset in ["BTC-USD", "ETH-USD"]:
-                price = fetch_crypto_data(asset.lower().replace("-", ""))
-                if price:
-                    print(f"💰 {asset} Price: ${price}")
-                else:
-                    print(f"❌ Failed to fetch price for {asset}")
-                    continue
-            else:
-                data = fetch_asset_data(asset)
-                if data is not None:
-                    latest_data = data.iloc[-1].to_dict()
-                    price = latest_data.get('Close', 0)
-                else:
-                    print(f"❌ No valid data for {asset}")
-                    continue
-
-            trade_decision = analyze_with_chatgpt(latest_data)
+            price = fetch_crypto_data(asset) if "USD" in asset else fetch_asset_data(asset).iloc[-1].get('Close', 0)
+            trade_decision = analyze_with_chatgpt({})
             print(f"📈 {asset} Decision: {trade_decision}")
             execute_trade(asset, trade_decision, price)
-        
+
         print("⏳ Waiting 5 minutes before next check...")
         time.sleep(300)
 
