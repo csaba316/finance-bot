@@ -48,10 +48,7 @@ def calculate_rsi(data, window=14):
 # ✅ Fetch Stock & Crypto Data
 def fetch_asset_data(symbol):
     try:
-        # Adjust symbol for Yahoo Finance
-        yf_symbol = symbol.replace("/", "-")  # Convert "BTC/USD" → "BTC-USD"
-        
-        stock = yf.download(yf_symbol, period="7d", interval="5m", auto_adjust=False, prepost=True)
+        stock = yf.download(symbol, period="7d", interval="5m", auto_adjust=False, prepost=True)
         if stock.empty:
             raise ValueError(f"❌ No data for {symbol}")
 
@@ -60,7 +57,6 @@ def fetch_asset_data(symbol):
     except Exception as e:
         print(f"❌ Error fetching data for {symbol}: {e}")
         return None
-
 
 # ✅ Calculate Indicators
 def calculate_indicators(stock):
@@ -89,7 +85,7 @@ def calculate_indicators(stock):
     except Exception as e:
         print(f"❌ Error calculating indicators: {e}")
         return None
-
+        
 # ✅ Query ChatGPT for Trade Decisions
 def analyze_with_chatgpt(data):
     prompt = f"""
@@ -134,7 +130,7 @@ def log_trade(symbol, action, quantity, price, reason):
 def execute_trade(symbol, decision, price):
     try:
         clock = alpaca.get_clock()
-        if symbol not in ["BTC/USD", "ETH/USD"] and not clock.is_open:
+        if symbol not in ["BTC-USD", "ETH-USD"] and not clock.is_open:
             print(f"⏸️ Market is closed. Logging trade for {symbol}.")
             log_trade(symbol, "SKIPPED", 0, price, "Market Closed")
             return
