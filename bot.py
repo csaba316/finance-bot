@@ -23,16 +23,25 @@ ASSETS = ["NVDA", "AAPL", "TSLA", "BTC-USD", "ETH-USD"]
 
 # ✅ Calculate RSI
 def calculate_rsi(data, window=14):
+    if 'Close' not in data.columns or len(data) < window:
+        print("⚠️ Not enough data to calculate RSI.")
+        return pd.Series(np.nan, index=data.index)  # Return NaN series to avoid KeyError
+    
     delta = data['Close'].diff()
     gain = delta.where(delta > 0, 0)
     loss = -delta.where(delta < 0, 0)
-    
+
     avg_gain = gain.ewm(span=window, adjust=False).mean()
     avg_loss = loss.ewm(span=window, adjust=False).mean()
-    
-    avg_loss.replace(0, 1e-10, inplace=True)
+
+    avg_loss.replace(0, 1e-10, inplace=True)  # Prevent division by zero
     rs = avg_gain / avg_loss
-    return 100 - (100 / (1 + rs))
+    rsi = 100 - (100 / (1 + rs))
+
+    # Debug: Print last few RSI values
+    print("✅ RSI Calculated: \n", rsi.tail())
+
+    return rsi.fillna(0)  # Ensure NaN values are replaced
 
 # ✅ Fetch Stock & Crypto Data
 def fetch_asset_data(symbol):
@@ -51,39 +60,36 @@ def fetch_asset_data(symbol):
 
 # ✅ Calculate RSI, MACD, Bollinger Bands, ATR
 def calculate_indicators(stock):
-    """Calculate RSI, SMA, MACD, Bollinger Bands, and ATR."""
     try:
-        # RSI Calculation
         stock['RSI'] = calculate_rsi(stock)
-        
-        # Moving Averages
+
+        if stock['RSI'].isna().all():
+            print("⚠️ Warning: RSI is completely NaN for this asset.")
+
         stock['SMA_50'] = stock['Close'].rolling(window=50).mean()
         stock['SMA_200'] = stock['Close'].rolling(window=200).mean()
 
-        # MACD Calculation
         exp12 = stock['Close'].ewm(span=12, adjust=False).mean()
         exp26 = stock['Close'].ewm(span=26, adjust=False).mean()
         stock['MACD'] = exp12 - exp26
         stock['MACD_Signal'] = stock['MACD'].ewm(span=9, adjust=False).mean()
 
-        # Bollinger Bands
         stock['Middle_Band'] = stock['Close'].rolling(window=20).mean()
         stock['Std_Dev'] = stock['Close'].rolling(window=20).std()
         stock['Upper_Band'] = stock['Middle_Band'] + (stock['Std_Dev'] * 2)
         stock['Lower_Band'] = stock['Middle_Band'] - (stock['Std_Dev'] * 2)
 
-        # ATR Calculation
         stock['High-Low'] = stock['High'] - stock['Low']
         stock['High-Close'] = abs(stock['High'] - stock['Close'].shift())
         stock['Low-Close'] = abs(stock['Low'] - stock['Close'].shift())
         stock['True_Range'] = stock[['High-Low', 'High-Close', 'Low-Close']].max(axis=1)
         stock['ATR'] = stock['True_Range'].rolling(window=14).mean()
 
-        return stock
+        return stock.fillna(0)  # Ensure no missing values
     except Exception as e:
         print(f"❌ Error calculating indicators: {e}")
         return None
-
+        
 # ✅ Query ChatGPT for Trade Decisions
 def analyze_with_chatgpt(data):
     """Send market indicators to ChatGPT for analysis."""
@@ -116,7 +122,6 @@ def execute_trade(symbol, decision):
 
 # ✅ Main Loop
 def main():
-    """Monitor assets and trade based on AI signals."""
     while True:
         for asset in ASSETS:
             print(f"📊 Fetching data for {asset}...")
@@ -124,6 +129,8 @@ def main():
             
             if data is not None:
                 latest_data = data.iloc[-1].to_dict()
+                if "RSI" not in latest_data:
+                    print(f"⚠️ Warning: RSI missing from latest_data for {asset}. Debug info: \n", data.tail())
                 trade_decision = analyze_with_chatgpt(latest_data)
                 print(f"📈 {asset} Decision: {trade_decision}")
                 execute_trade(asset, trade_decision)
