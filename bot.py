@@ -48,7 +48,7 @@ def fetch_asset_data(symbol):
         return None
 
 # ✅ Improved Crypto Data Retrieval
-def fetch_crypto_data(symbol):
+def fetch_crypto_data(symbol, retries=3):
     coin_map = {"BTC-USD": "bitcoin", "ETH-USD": "ethereum"}
     coin_id = coin_map.get(symbol, None)
 
@@ -57,14 +57,17 @@ def fetch_crypto_data(symbol):
         return None
 
     url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd"
-    try:
-        response = requests.get(url).json()
-        if coin_id not in response:
-            raise ValueError(f"❌ No crypto data for {symbol}")
-        return response[coin_id]['usd']
-    except Exception as e:
-        print(f"❌ Error fetching crypto data for {symbol}: {e}")
-        return None
+    
+    for attempt in range(retries):
+        try:
+            response = requests.get(url, timeout=10).json()
+            if coin_id not in response or 'usd' not in response[coin_id]:
+                raise ValueError(f"❌ No crypto data for {symbol}")
+            return response[coin_id]['usd']
+        except Exception as e:
+            print(f"❌ Attempt {attempt+1} error fetching crypto data for {symbol}: {e}")
+            time.sleep(2)
+    return None
         
 # ✅ Calculate RSI
 def calculate_rsi(data, window=14):
@@ -188,12 +191,15 @@ def main():
             price = 0
 
             if asset in ["BTC-USD", "ETH-USD"]:
-                price = fetch_crypto_data(asset)
-                if price:
-                    print(f"💰 {asset} Price: ${price}")
-                else:
-                    print(f"❌ Failed to fetch price for {asset}")
-                    continue
+            price = fetch_crypto_data(asset)
+            if price:
+            print(f"💰 {asset} Price: ${price}")
+            latest_data = {'Close': price, 'RSI': np.nan, 'SMA_50': np.nan, 'SMA_200': np.nan,
+                       'MACD': np.nan, 'MACD_Signal': np.nan, 'Upper_Band': np.nan, 'Lower_Band': np.nan}
+            else:
+            print(f"❌ Failed to fetch price for {asset}")
+            continue
+        
             else:
                 stock_data = fetch_asset_data(asset)
                 if stock_data is None or stock_data.empty:
