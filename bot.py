@@ -40,11 +40,18 @@ def fetch_asset_data(symbol):
         # Attempt fetching intraday data
         stock = yf.download(symbol, period="7d", interval=interval, auto_adjust=True, prepost=True)
 
+        # ✅ Handle Multi-Index Issue
+        if isinstance(stock.columns, pd.MultiIndex):
+            stock = stock.xs(symbol, level=1, axis=1)
+
         # ✅ Debug: Print fetched data
         if stock.empty:
             print(f"⚠️ No data for {symbol} using interval {interval}. Trying daily data...")
             stock = yf.download(symbol, period="30d", interval="1d", auto_adjust=True)
-        
+
+            if isinstance(stock.columns, pd.MultiIndex):
+                stock = stock.xs(symbol, level=1, axis=1)
+
         if stock.empty:
             raise ValueError(f"❌ No valid stock data for {symbol} (empty DataFrame)")
 
@@ -53,7 +60,7 @@ def fetch_asset_data(symbol):
             raise ValueError(f"❌ 'Close' price missing for {symbol} (columns: {stock.columns.tolist()})")
 
         # ✅ Debug: Print last few rows of stock data
-        print(f"📊 {symbol} data preview:\n{stock.tail(3)}")
+        print(f"📊 {symbol} data preview:\n{stock[['Close']].tail(3)}")
 
         # Forward-fill missing values and calculate indicators
         stock = stock.ffill().dropna()
