@@ -191,14 +191,14 @@ def main():
             price = 0
 
             if asset in ["BTC-USD", "ETH-USD"]:
-            price = fetch_crypto_data(asset)
-            if price:
-            print(f"💰 {asset} Price: ${price}")
-            latest_data = {'Close': price, 'RSI': np.nan, 'SMA_50': np.nan, 'SMA_200': np.nan,
-                       'MACD': np.nan, 'MACD_Signal': np.nan, 'Upper_Band': np.nan, 'Lower_Band': np.nan}
-            else:
-            print(f"❌ Failed to fetch price for {asset}")
-            continue
+                price = fetch_crypto_data(asset)
+                if price:
+                    print(f"💰 {asset} Price: ${price}")
+                    latest_data = {'Close': price, 'RSI': np.nan, 'SMA_50': np.nan, 'SMA_200': np.nan,
+                                   'MACD': np.nan, 'MACD_Signal': np.nan, 'Upper_Band': np.nan, 'Lower_Band': np.nan}
+                else:
+                    print(f"❌ Failed to fetch price for {asset}")
+                    continue
         
             else:
                 stock_data = fetch_asset_data(asset)
