@@ -21,6 +21,19 @@ alpaca = REST(ALPACA_API_KEY, ALPACA_SECRET_KEY, ALPACA_BASE_URL)
 # Assets to Monitor
 ASSETS = ["NVDA", "AAPL", "TSLA", "BTC-USD", "ETH-USD"]
 
+# ✅ Calculate RSI
+def calculate_rsi(data, window=14):
+    delta = data['Close'].diff()
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+    
+    avg_gain = gain.ewm(span=window, adjust=False).mean()
+    avg_loss = loss.ewm(span=window, adjust=False).mean()
+    
+    avg_loss.replace(0, 1e-10, inplace=True)
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
+
 # ✅ Fetch Stock & Crypto Data
 def fetch_asset_data(symbol):
     """Fetch stock/crypto data and compute indicators."""
