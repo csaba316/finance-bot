@@ -23,7 +23,7 @@ alpaca_assets = {asset.symbol: asset for asset in alpaca.list_assets()}
 crypto_assets = {asset.symbol: asset for asset in alpaca.list_assets(asset_class="crypto")}
 
 # Assets to Monitor
-ASSETS = ["NVDA", "AAPL", "TSLA", "MSFT", "GOOGL", "BTC/USD", "ETH/USD"]  # Adjusted crypto symbols for Alpaca
+ASSETS = ["NVDA", "AAPL", "TSLA", "MSFT", "GOOGL", "BTC-USD", "ETH-USD"]  # Fixed Crypto Symbols
 
 # Position Sizing Parameters
 CAPITAL_ALLOCATION = 0.05  # Allocate 5% of capital per trade
@@ -52,7 +52,10 @@ def calculate_rsi(data, window=14):
 # ✅ Fetch Stock & Crypto Data
 def fetch_asset_data(symbol):
     try:
-        stock = yf.download(symbol, period="7d", interval="5m", auto_adjust=False, prepost=True)
+        # Choose a different interval when market is closed
+        interval = "5m" if alpaca.get_clock().is_open else "30m"
+        stock = yf.download(symbol, period="7d", interval=interval, auto_adjust=False, prepost=True)
+        
         if stock.empty:
             raise ValueError(f"❌ No data for {symbol}")
 
@@ -61,6 +64,19 @@ def fetch_asset_data(symbol):
     except Exception as e:
         print(f"❌ Error fetching data for {symbol}: {e}")
         return None
+
+# ✅ Fix Crypto Data Retrieval
+def fetch_crypto_data(symbol):
+    url = f"https://api.coingecko.com/api/v3/simple/price?ids={symbol.lower()}&vs_currencies=usd"
+    try:
+        response = requests.get(url).json()
+        if symbol.lower() not in response:
+            raise ValueError(f"❌ No crypto data for {symbol}")
+        return response[symbol.lower()]['usd']
+    except Exception as e:
+        print(f"❌ Error fetching crypto data for {symbol}: {e}")
+        return None
+
 
 # ✅ Calculate Indicators
 def calculate_indicators(stock):
@@ -124,7 +140,7 @@ def log_trade(symbol, action, quantity, price, reason):
     df.to_csv(TRADE_LOG_FILE, mode='a', header=not os.path.exists(TRADE_LOG_FILE), index=False)
     print(f"📜 Trade logged: {trade_data}")
 
-# ✅ Execute Trade
+# ✅ Fix Trading Execution
 def execute_trade(symbol, decision, price):
     try:
         is_crypto = symbol in crypto_assets
@@ -137,7 +153,7 @@ def execute_trade(symbol, decision, price):
         
         account = alpaca.get_account()
         buying_power = float(account.buying_power)
-        trade_amount = buying_power * CAPITAL_ALLOCATION
+        trade_amount = buying_power * 0.05  # 5% capital allocation
         quantity = round(trade_amount / price, 6)
 
         reason = decision.split("REASON:")[1].strip() if "REASON:" in decision else decision
@@ -156,18 +172,30 @@ def execute_trade(symbol, decision, price):
     except Exception as e:
         print(f"❌ Error executing trade for {symbol}: {e}")
 
-# ✅ Main Loop
+# ✅ Fix Main Loop
 def main():
     while True:
         for asset in ASSETS:
             print(f"📊 Fetching data for {asset}...")
-            data = fetch_asset_data(asset)
-            if data is not None:
-                latest_data = data.iloc[-1].to_dict()
-                price = latest_data.get('Close', 0)
-                trade_decision = analyze_with_chatgpt(latest_data)
-                print(f"📈 {asset} Decision: {trade_decision}")
-                execute_trade(asset, trade_decision, price)
+            if asset in ["BTC-USD", "ETH-USD"]:
+                price = fetch_crypto_data(asset.lower().replace("-", ""))
+                if price:
+                    print(f"💰 {asset} Price: ${price}")
+                else:
+                    print(f"❌ Failed to fetch price for {asset}")
+                    continue
+            else:
+                data = fetch_asset_data(asset)
+                if data is not None:
+                    latest_data = data.iloc[-1].to_dict()
+                    price = latest_data.get('Close', 0)
+                else:
+                    print(f"❌ No valid data for {asset}")
+                    continue
+
+            trade_decision = analyze_with_chatgpt(latest_data)
+            print(f"📈 {asset} Decision: {trade_decision}")
+            execute_trade(asset, trade_decision, price)
         
         print("⏳ Waiting 5 minutes before next check...")
         time.sleep(300)
