@@ -37,7 +37,8 @@ def fetch_asset_data(symbol):
         interval = "5m" if alpaca.get_clock().is_open else "30m"
         stock = yf.download(symbol, period="7d", interval=interval, auto_adjust=True, prepost=True)
 
-        if stock.empty or stock['Close'].isna().all():
+        # ✅ FIX: Properly handle the boolean condition
+        if stock.empty or (stock['Close'].isna().all()):
             raise ValueError(f"❌ No valid stock data for {symbol}")
 
         stock = stock.ffill().dropna()
@@ -46,7 +47,7 @@ def fetch_asset_data(symbol):
     except Exception as e:
         print(f"❌ Error fetching data for {symbol}: {e}")
         return None
-
+        
 # ✅ Improved Crypto Data Retrieval
 def fetch_crypto_data(symbol, retries=3):
     coin_map = {"BTC-USD": "bitcoin", "ETH-USD": "ethereum"}
