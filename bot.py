@@ -100,8 +100,18 @@ def analyze_with_chatgpt(data):
     - ATR: {data.get('ATR', 'N/A')}
     Should I BUY, SELL, or HOLD?
     """
-    response = client.completions.create(model="gpt-4", messages=[{"role": "user", "content": prompt}])
-    return response.choices[0].message['content'].strip().upper()
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a world expert at stock and crypto trading."},
+                {"role": "assistant", "name": "zapier", "content": prompt}
+            ]
+        )
+        return response.choices[0].message.content.strip().upper()
+    except Exception as e:
+        print(f"❌ Error querying OpenAI: {e}")
+        return "HOLD"
 
 # ✅ Execute Trade on Alpaca
 def execute_trade(symbol, decision):
