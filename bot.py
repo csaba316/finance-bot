@@ -260,9 +260,9 @@ def execute_trade(symbol, decision, price, reason):
             # ✅ Calculate trade amount (5% of available capital)
             trade_amount = min(buying_power * CAPITAL_ALLOCATION, float(account.cash))
                 
-                if trade_amount < 10:
-                    print(f"❌ Trade amount for {symbol} is below Alpaca's minimum ($10). Skipping trade...")
-                    return
+            if trade_amount < 10:
+                print(f"❌ Trade amount for {symbol} is below Alpaca's minimum ($10). Skipping trade...")
+                return
 
             # ✅ Calculate quantity
             quantity = round(trade_amount / price, 6)
