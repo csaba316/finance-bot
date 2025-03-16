@@ -351,7 +351,7 @@ def main():
 
             trade_decision = analyze_with_chatgpt(latest_data)
             print(f"📈 {asset} Decision: {trade_decision}")
-            execute_trade(asset, trade_decision, price)
+            execute_trade(asset, trade_decision, price, reason)
 
         print("⏳ Waiting 5 minutes before next check...")
         time.sleep(300)
