@@ -289,15 +289,16 @@ def main():
             price = 0
 
             if asset in ["BTC-USD", "ETH-USD"]:
-                price = fetch_crypto_data(asset)
-                if price:
-                    print(f"💰 {asset} Price: ${price}")
-                    latest_data = {'Close': price, 'RSI': np.nan, 'SMA_50': np.nan, 'SMA_200': np.nan,
-                                   'MACD': np.nan, 'MACD_Signal': np.nan, 'Upper_Band': np.nan, 'Lower_Band': np.nan}
-                else:
+                price_data = fetch_crypto_data(asset)
+
+                # ✅ Corrected: Check if price_data is None or Empty
+                if price_data is None or price_data.empty:
                     print(f"❌ Failed to fetch price for {asset}")
-                    continue
-        
+                    continue  # Skip this asset
+
+                price = price_data["Close"].iloc[-1]  # Get the latest closing price
+                print(f"💰 {asset} Price: ${price:.2f}")
+
             else:
                 stock_data = fetch_asset_data(asset)
                 if stock_data is None or stock_data.empty:
