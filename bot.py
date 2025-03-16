@@ -178,13 +178,28 @@ def analyze_with_chatgpt(data):
     """
 
     try:
-        completion = client.beta.threads.create_and_run(
-            assistant_id=ZAPIER_ASSISTANT_ID,  # Use the environment variable
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}]
+        # ✅ Create a thread first
+        thread = client.beta.threads.create()
+
+        # ✅ Run the assistant on that thread
+        run = client.beta.threads.runs.create(
+            thread_id=thread.id,
+            assistant_id=ZAPIER_ASSISTANT_ID,
+            instructions="Analyze the given stock/crypto indicators and provide a BUY/SELL/HOLD decision.",
+            input={"content": prompt}
         )
 
-        return completion.choices[0].message.content.strip().upper()
+        # ✅ Wait for the response to be generated
+        while run.status in ["queued", "in_progress"]:
+            time.sleep(2)  # Wait for processing
+            run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
+
+        # ✅ Fetch the response
+        if run.status == "completed":
+            messages = client.beta.threads.messages.list(thread_id=thread.id)
+            return messages.data[0].content[0].text.value.strip().upper()
+        else:
+            raise ValueError(f"Unexpected run status: {run.status}")
 
     except Exception as e:
         print(f"❌ Error querying OpenAI: {e}")
