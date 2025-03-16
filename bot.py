@@ -247,20 +247,18 @@ def queue_trade(symbol, decision, price, reason):
 def execute_trade(symbol, decision, price, reason):
     """Executes a trade based on the decision from ChatGPT."""
     try:
-        # ✅ Ensure price is valid
         if price <= 0:
             print(f"❌ Invalid price for {symbol}. Skipping trade...")
             return
 
-        # ✅ Fetch account balance
+        # ✅ Fetch Alpaca account balance
         account = alpaca.get_account()
         buying_power = float(account.buying_power)
 
         if "BUY" in decision:
-            # ✅ Calculate trade amount (5% of capital, ensuring it doesn't exceed available cash)
-            trade_amount = min(buying_power * 0.05, float(account.cash))
+            # ✅ Calculate trade amount (5% of capital, ensuring it doesn’t exceed available cash)
+            trade_amount = min(buying_power * CAPITAL_ALLOCATION, float(account.cash))
 
-            # ✅ Ensure trade amount is at least $10 (Alpaca's minimum)
             if trade_amount < 10:
                 print(f"❌ Trade amount for {symbol} is below Alpaca's minimum ($10). Skipping trade...")
                 return
@@ -272,7 +270,7 @@ def execute_trade(symbol, decision, price, reason):
                 print(f"❌ Trade quantity too small for {symbol}. Skipping trade...")
                 return
 
-            # ✅ Execute order with error handling
+            # ✅ Execute trade
             try:
                 alpaca.submit_order(symbol=symbol, qty=quantity, side="buy", type="market", time_in_force="gtc")
                 print(f"✅ Bought {quantity} of {symbol} at ${price:.2f}")
@@ -281,7 +279,6 @@ def execute_trade(symbol, decision, price, reason):
                 print(f"❌ Error executing trade for {symbol}: {e}")
 
         elif "SELL" in decision:
-            # ✅ Fetch position details
             try:
                 position = alpaca.get_position(symbol)
                 available_qty = float(position.qty)
@@ -293,12 +290,11 @@ def execute_trade(symbol, decision, price, reason):
                 # ✅ Sell entire position (or partial, based on strategy)
                 quantity = available_qty
 
-                # ✅ Ensure minimum order size
                 if quantity * price < 10:
                     print(f"❌ Trade amount for {symbol} is below Alpaca's minimum ($10). Skipping trade...")
                     return
 
-                # ✅ Execute order with error handling
+                # ✅ Execute sell order
                 try:
                     alpaca.submit_order(symbol=symbol, qty=quantity, side="sell", type="market", time_in_force="gtc")
                     print(f"✅ Sold {quantity} of {symbol} at ${price:.2f}")
@@ -312,8 +308,6 @@ def execute_trade(symbol, decision, price, reason):
     except Exception as e:
         print(f"❌ Unexpected error in execute_trade(): {e}")
 
-
-
 # ✅ Main Loop
 def main():
     while True:
@@ -324,13 +318,11 @@ def main():
             if asset in ["BTC-USD", "ETH-USD"]:
                 price_data = fetch_crypto_data(asset)
 
-                # ✅ Ensure price_data is valid and contains data
                 if price_data is None or price_data.empty:
                     print(f"❌ Failed to fetch price for {asset}")
                     continue  
 
                 price = float(price_data["Close"].iloc[-1]) if not price_data.empty else 0.0
-
                 print(f"💰 {asset} Price: ${price:.2f}")
 
             else:
@@ -342,16 +334,28 @@ def main():
                 latest_data = stock_data.iloc[-1].to_dict()
                 price = latest_data.get('Close', 0)
 
-                # ✅ Ensure price is a valid float
                 if isinstance(price, pd.Series):
                     price = float(price.iloc[-1])
                 elif price == 0 or price is None:
                     print(f"❌ Price data unavailable for {asset}")
                     continue
 
+            # ✅ Get Decision and Extract Reason
             trade_decision = analyze_with_chatgpt(latest_data)
             print(f"📈 {asset} Decision: {trade_decision}")
-            execute_trade(asset, trade_decision, price, reason)
+
+            # ✅ Extract "BUY/SELL/HOLD" and the reason from the response
+            if "DECISION:" in trade_decision and "REASON:" in trade_decision:
+                decision_part = trade_decision.split("DECISION:")[1].strip()
+                decision, reason = decision_part.split("REASON:", 1)
+                decision = decision.strip()
+                reason = reason.strip()
+            else:
+                decision = "HOLD"
+                reason = "Could not extract reason from response."
+
+            # ✅ Execute Trade
+            execute_trade(asset, decision, price, reason)
 
         print("⏳ Waiting 5 minutes before next check...")
         time.sleep(300)
