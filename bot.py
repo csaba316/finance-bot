@@ -296,7 +296,7 @@ def main():
                     print(f"❌ Failed to fetch price for {asset}")
                     continue  
 
-                price = float(price_data["Close"].iloc[-1])  # ✅ Convert to float
+                price = float(price_data["Close"].iloc[-1]) if not price_data["Close"].empty else 0
                 print(f"💰 {asset} Price: ${price:.2f}")
 
             else:
