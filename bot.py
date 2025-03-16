@@ -185,8 +185,7 @@ def analyze_with_chatgpt(data):
         run = client.beta.threads.runs.create(
             thread_id=thread.id,
             assistant_id=ZAPIER_ASSISTANT_ID,
-            instructions="Analyze the given stock/crypto indicators and provide a BUY/SELL/HOLD decision.",
-            input={"content": prompt}
+            parameters={"messages": [{"role": "user", "content": prompt}]}
         )
 
         # ✅ Wait for the response to be generated
