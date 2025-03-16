@@ -76,20 +76,22 @@ def fetch_asset_data(symbol):
 def fetch_crypto_data(symbol, retries=5):
     binance_symbol = symbol.replace("-USD", "USDT")  # Convert BTC-USD → BTCUSDT
     binance_candles_url = f"https://api.binance.com/api/v3/klines?symbol={binance_symbol}&interval=1h&limit=168"
-    binance_avg_url = f"https://api.binance.com/api/v3/avgPrice?symbol={binance_symbol}"  # Fallback if OHLC data fails
+    binance_avg_url = f"https://api.binance.com/api/v3/avgPrice?symbol={binance_symbol}"  # Fallback
 
     for attempt in range(retries):
         try:
             # ✅ Try Binance OHLC Data First
             response = requests.get(binance_candles_url, timeout=10)
-            if response.status_code == 200 and isinstance(response.json(), list):
+            if response.status_code == 200:
                 data = response.json()
-                df = pd.DataFrame(data, columns=["timestamp", "Open", "High", "Low", "Close", "Volume", "CloseTime", 
-                                                 "QuoteAssetVolume", "Trades", "TakerBuyBase", "TakerBuyQuote", "Ignore"])
-                df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
-                df["Close"] = df["Close"].astype(float)
-                df.set_index("timestamp", inplace=True)
-                return calculate_indicators(df)
+                if isinstance(data, list) and len(data) > 0:
+                    df = pd.DataFrame(data, columns=["timestamp", "Open", "High", "Low", "Close", "Volume", 
+                                                     "CloseTime", "QuoteAssetVolume", "Trades", "TakerBuyBase", 
+                                                     "TakerBuyQuote", "Ignore"])
+                    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+                    df["Close"] = df["Close"].astype(float)
+                    df.set_index("timestamp", inplace=True)
+                    return calculate_indicators(df)
 
             # ✅ If OHLC Fails, Use Binance Average Price API
             response = requests.get(binance_avg_url, timeout=10)
@@ -97,6 +99,11 @@ def fetch_crypto_data(symbol, retries=5):
                 price = float(response.json().get("price", 0))
                 if price > 0:
                     return pd.DataFrame({"Close": [price]}, index=[pd.Timestamp.now()])
+
+            # ✅ Handle Binance Rate Limit (429 Error)
+            if response.status_code == 429:
+                print(f"⏳ Binance rate limit exceeded. Waiting before retrying...")
+                time.sleep(10 * (attempt + 1))  # Exponential backoff
 
         except Exception as e:
             print(f"❌ Attempt {attempt+1} error fetching crypto data for {symbol}: {e}")
