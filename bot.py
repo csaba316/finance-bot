@@ -250,6 +250,9 @@ def execute_trade(symbol, decision, price, reason):
         if price <= 0:
             print(f"❌ Invalid price for {symbol}. Skipping trade...")
             return
+            
+        # ✅ Ensure `time_in_force` is always defined
+        time_in_force = "day"
 
         # ✅ Fetch Alpaca account balance before using it
         account = alpaca.get_account()
@@ -326,7 +329,6 @@ def execute_trade(symbol, decision, price, reason):
 # ✅ Main Loop
 def main():
     while True:
-        # ✅ Fetch Alpaca account data first
         try:
             account = alpaca.get_account()
             buying_power = float(account.buying_power)
@@ -342,10 +344,9 @@ def main():
                 print(f"❌ Failed to fetch price for {asset}")
                 continue  
 
-            # ✅ Ensure price is extracted as a single float value
             price = price_data["Close"].iloc[-1] if "Close" in price_data.columns else 0
             if isinstance(price, pd.Series):
-                price = price.iloc[-1]  # Get the last value in the series
+                price = price.iloc[-1]
             price = float(price) if not pd.isna(price) else 0
 
             if price <= 0:
@@ -354,16 +355,14 @@ def main():
 
             print(f"💰 {asset} Price: ${price:.2f}")
 
-            # ✅ Adjust trade amount to meet Alpaca’s minimum trade requirement ($10)
             trade_amount = min(buying_power * CAPITAL_ALLOCATION, float(account.cash))
 
             if trade_amount < 10:
                 print(f"❌ Trade amount for {asset} is below Alpaca's minimum ($10). Adjusting allocation...")
-
-                # Increase allocation gradually until it reaches $10 or more
+                
                 adjusted_allocation = CAPITAL_ALLOCATION
                 while adjusted_allocation < 1.0 and (buying_power * adjusted_allocation) < 10:
-                    adjusted_allocation += 0.05  # Increase in 5% steps
+                    adjusted_allocation += 0.05 
 
                 trade_amount = buying_power * adjusted_allocation
                 print(f"✅ Adjusted trade amount: ${trade_amount:.2f}")
@@ -372,12 +371,10 @@ def main():
                     print(f"❌ Still below $10, skipping {asset} trade.")
                     continue
 
-            # ✅ Get Decision and Extract Reason
             latest_data = price_data.iloc[-1].to_dict()
             trade_decision = analyze_with_chatgpt(latest_data)
             print(f"📈 {asset} Decision: {trade_decision}")
 
-            # ✅ Extract "BUY/SELL/HOLD" and reason
             if "DECISION:" in trade_decision and "REASON:" in trade_decision:
                 decision_part = trade_decision.split("DECISION:")[1].strip()
                 decision, reason = decision_part.split("REASON:", 1)
@@ -387,7 +384,6 @@ def main():
                 decision = "HOLD"
                 reason = "Could not extract reason from response."
 
-            # ✅ Execute Trade Safely
             execute_trade(asset, decision, price, reason)
 
         print("⏳ Waiting 5 minutes before next check...")
