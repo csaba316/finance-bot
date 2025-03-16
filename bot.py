@@ -73,44 +73,26 @@ def fetch_asset_data(symbol):
         return None
 
 # ✅ Improved Crypto Data Retrieval
-def fetch_crypto_data(symbol, retries=5):
-    binance_symbol = symbol.replace("-USD", "USDT")  # Convert BTC-USD → BTCUSDT
-    binance_candles_url = f"https://api.binance.com/api/v3/klines?symbol={binance_symbol}&interval=1h&limit=168"
-    binance_avg_url = f"https://api.binance.com/api/v3/avgPrice?symbol={binance_symbol}"  # Fallback
+def fetch_crypto_data(symbol):
+    yahoo_symbol_map = {
+        "BTC-USD": "BTC-USD",
+        "ETH-USD": "ETH-USD"
+    }
+    yahoo_symbol = yahoo_symbol_map.get(symbol, symbol)  # Ensure correct symbol format
 
-    for attempt in range(retries):
-        try:
-            # ✅ Try Binance OHLC Data First
-            response = requests.get(binance_candles_url, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list) and len(data) > 0:
-                    df = pd.DataFrame(data, columns=["timestamp", "Open", "High", "Low", "Close", "Volume", 
-                                                     "CloseTime", "QuoteAssetVolume", "Trades", "TakerBuyBase", 
-                                                     "TakerBuyQuote", "Ignore"])
-                    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
-                    df["Close"] = df["Close"].astype(float)
-                    df.set_index("timestamp", inplace=True)
-                    return calculate_indicators(df)
+    try:
+        # ✅ Fetch last 7 days of data with 1-hour intervals
+        crypto_data = yf.download(yahoo_symbol, period="7d", interval="1h", auto_adjust=True, prepost=True)
 
-            # ✅ If OHLC Fails, Use Binance Average Price API
-            response = requests.get(binance_avg_url, timeout=10)
-            if response.status_code == 200:
-                price = float(response.json().get("price", 0))
-                if price > 0:
-                    return pd.DataFrame({"Close": [price]}, index=[pd.Timestamp.now()])
+        if crypto_data.empty or crypto_data["Close"].isna().all():
+            raise ValueError(f"❌ No valid crypto data for {symbol}")
 
-            # ✅ Handle Binance Rate Limit (429 Error)
-            if response.status_code == 429:
-                print(f"⏳ Binance rate limit exceeded. Waiting before retrying...")
-                time.sleep(10 * (attempt + 1))  # Exponential backoff
+        crypto_data = crypto_data.ffill().dropna()  # Fill missing data
+        return calculate_indicators(crypto_data)
 
-        except Exception as e:
-            print(f"❌ Attempt {attempt+1} error fetching crypto data for {symbol}: {e}")
-            time.sleep(2 ** attempt)  # Exponential backoff
-
-    print(f"❌ Final failure: Could not fetch {symbol} price data.")
-    return None
+    except Exception as e:
+        print(f"❌ Error fetching Yahoo Finance data for {symbol}: {e}")
+        return None
         
 # ✅ Calculate RSI
 def calculate_rsi(data, window=14):
