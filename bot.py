@@ -342,20 +342,35 @@ def main():
                 print(f"❌ Failed to fetch price for {asset}")
                 continue  
 
-            # ✅ Ensure valid price before proceeding
+            # ✅ Ensure price is extracted as a single float value
             price = price_data["Close"].iloc[-1] if "Close" in price_data.columns else 0
-            if pd.isna(price) or price <= 0:
+            if isinstance(price, pd.Series):
+                price = price.iloc[-1]  # Get the last value in the series
+            price = float(price) if not pd.isna(price) else 0
+
+            if price <= 0:
                 print(f"❌ Invalid price for {asset}. Skipping trade...")
                 continue
-            price = float(price)
 
             print(f"💰 {asset} Price: ${price:.2f}")
 
-            # ✅ Ensure trade amount is above Alpaca's minimum ($10)
+            # ✅ Adjust trade amount to meet Alpaca’s minimum trade requirement ($10)
             trade_amount = min(buying_power * CAPITAL_ALLOCATION, float(account.cash))
+
             if trade_amount < 10:
-                print(f"❌ Trade amount for {asset} is below Alpaca's minimum ($10). Skipping trade...")
-                continue
+                print(f"❌ Trade amount for {asset} is below Alpaca's minimum ($10). Adjusting allocation...")
+
+                # Increase allocation gradually until it reaches $10 or more
+                adjusted_allocation = CAPITAL_ALLOCATION
+                while adjusted_allocation < 1.0 and (buying_power * adjusted_allocation) < 10:
+                    adjusted_allocation += 0.05  # Increase in 5% steps
+
+                trade_amount = buying_power * adjusted_allocation
+                print(f"✅ Adjusted trade amount: ${trade_amount:.2f}")
+
+                if trade_amount < 10:
+                    print(f"❌ Still below $10, skipping {asset} trade.")
+                    continue
 
             # ✅ Get Decision and Extract Reason
             latest_data = price_data.iloc[-1].to_dict()
@@ -377,6 +392,6 @@ def main():
 
         print("⏳ Waiting 5 minutes before next check...")
         time.sleep(300)
-
+        
 if __name__ == "__main__":
     main()
