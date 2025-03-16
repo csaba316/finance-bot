@@ -278,16 +278,21 @@ def execute_trade(symbol, decision, price):
             # ✅ Ensure trade does not exceed available cash balance
             trade_amount = min(buying_power * 0.05, float(account.cash))
     
+            # ✅ Ensure trade amount is at least $10 (Alpaca's minimum)
+            if trade_amount < 10:
+                print(f"❌ Trade amount for {symbol} is below Alpaca's minimum ($10). Skipping trade...")
+                return
+    
             # ✅ Calculate quantity and ensure it is positive
             quantity = max(round(trade_amount / price, 6), 0.000001)  
 
             if quantity <= 0:
-                print(f"❌ Trade quantity too small for {symbol}. Skipping...")
+                print(f"❌ Trade quantity too small for {symbol}. Skipping trade...")
                 return
-
-            alpaca.submit_order(symbol=alpaca_symbol, qty=quantity, side="buy", type="market", time_in_force="gtc")
-            print(f"✅ Bought {quantity} of {alpaca_symbol}")
-            log_trade(alpaca_symbol, "BUY", quantity, price, reason)
+        
+    alpaca.submit_order(symbol=alpaca_symbol, qty=quantity, side="buy", type="market", time_in_force="gtc")
+    print(f"✅ Bought {quantity} of {alpaca_symbol}")
+    log_trade(alpaca_symbol, "BUY", quantity, price, reason)
 
 
         elif "SELL" in decision:
