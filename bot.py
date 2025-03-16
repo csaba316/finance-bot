@@ -13,6 +13,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 ALPACA_API_KEY = os.getenv("ALPACA_API_KEY")
 ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
 ALPACA_BASE_URL = "https://paper-api.alpaca.markets"
+ZAPIER_ASSISTANT_ID = os.getenv("ZAPIER_ASSISTANT_ID")
 
 # Initialize APIs
 client = OpenAI(api_key=OPENAI_API_KEY)
@@ -120,21 +121,35 @@ def calculate_rsi(data, window=14):
 # ✅ Calculate Indicators
 def calculate_indicators(stock):
     try:
+        # ✅ Calculate RSI
         stock['RSI'] = calculate_rsi(stock)
+
+        # ✅ Moving Averages
         stock['SMA_50'] = stock['Close'].rolling(window=50).mean()
         stock['SMA_200'] = stock['Close'].rolling(window=200).mean()
 
+        # ✅ Exponential Moving Averages (EMA)
+        stock['EMA_9'] = stock['Close'].ewm(span=9, adjust=False).mean()
+        stock['EMA_21'] = stock['Close'].ewm(span=21, adjust=False).mean()
+
+        # ✅ MACD Indicator
         exp12 = stock['Close'].ewm(span=12, adjust=False).mean()
         exp26 = stock['Close'].ewm(span=26, adjust=False).mean()
         stock['MACD'] = exp12 - exp26
         stock['MACD_Signal'] = stock['MACD'].ewm(span=9, adjust=False).mean()
 
+        # ✅ Bollinger Bands
         stock['Middle_Band'] = stock['Close'].rolling(window=20).mean()
         stock['Std_Dev'] = stock['Close'].rolling(window=20).std()
         stock['Upper_Band'] = stock['Middle_Band'] + (stock['Std_Dev'] * 2)
         stock['Lower_Band'] = stock['Middle_Band'] - (stock['Std_Dev'] * 2)
 
+        # ✅ VWAP Calculation
+        stock['VWAP'] = (stock['Close'] * stock['Volume']).cumsum() / stock['Volume'].cumsum()
+
+        # ✅ Ensure no NaNs are present
         return stock.fillna(0)
+
     except Exception as e:
         print(f"❌ Error calculating indicators: {e}")
         return None
@@ -145,25 +160,32 @@ def analyze_with_chatgpt(data):
         return "DECISION: HOLD. REASON: NOT ENOUGH VALID MARKET DATA."
 
     prompt = f"""
-    You are a professional stock and crypto trader providing concise trade signals.
-    Given these indicators:
-    RSI: {data.get('RSI', 'N/A')}, SMA50: {data.get('SMA_50', 'N/A')}, SMA200: {data.get('SMA_200', 'N/A')},
-    MACD: {data.get('MACD', 'N/A')}, MACD Signal: {data.get('MACD_Signal', 'N/A')}, 
-    Upper Band: {data.get('Upper_Band', 'N/A')}, Lower Band: {data.get('Lower_Band', 'N/A')}.
+    You are an expert stock and crypto trader. Analyze these indicators:
 
-    Provide a decision: BUY, SELL, or HOLD.
+    RSI: {data.get('RSI', 'N/A')}, 
+    SMA50: {data.get('SMA_50', 'N/A')}, SMA200: {data.get('SMA_200', 'N/A')},
+    EMA9: {data.get('EMA_9', 'N/A')}, EMA21: {data.get('EMA_21', 'N/A')},
+    MACD: {data.get('MACD', 'N/A')}, MACD Signal: {data.get('MACD_Signal', 'N/A')},
+    Upper Band: {data.get('Upper_Band', 'N/A')}, Lower Band: {data.get('Lower_Band', 'N/A')},
+    VWAP: {data.get('VWAP', 'N/A')}.
+
+    - If EMA9 crosses above EMA21, MACD is above the signal line, and RSI is above 50, it's a strong buy signal.
+    - If EMA9 crosses below EMA21, MACD is below the signal line, and RSI is below 50, it's a strong sell signal.
+    - Otherwise, hold.
+
     Format response strictly as:
     "DECISION: [BUY/SELL/HOLD]. REASON: [SHORT REASON]"
     """
+
     try:
-        response = client.chat.completions.create(
+        completion = client.beta.threads.create_and_run(
+            assistant_id=ZAPIER_ASSISTANT_ID,  # Use the environment variable
             model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are a world expert at stock and crypto trading."},
-                {"role": "user", "content": prompt}
-            ]
+            messages=[{"role": "user", "content": prompt}]
         )
-        return response.choices[0].message.content.strip().upper()
+
+        return completion.choices[0].message.content.strip().upper()
+
     except Exception as e:
         print(f"❌ Error querying OpenAI: {e}")
         return "DECISION: HOLD. REASON: API ERROR."
@@ -194,24 +216,44 @@ def execute_trade(symbol, decision, price):
         
         account = alpaca.get_account()
         buying_power = float(account.buying_power)
-        trade_amount = buying_power * 0.05  # 5% capital allocation
+        trade_amount = buying_power * CAPITAL_ALLOCATION
         quantity = round(trade_amount / price, 6)
 
         reason = decision.split("REASON:")[1].strip() if "REASON:" in decision else decision
 
         if "BUY" in decision and quantity > 0:
-            alpaca.submit_order(symbol=symbol, qty=quantity, side="buy", type="market", time_in_force="gtc")
-            print(f"✅ Bought {quantity} of {symbol}")
+            order = alpaca.submit_order(
+                symbol=symbol, qty=quantity, side="buy", type="market", time_in_force="gtc"
+            )
+            print(f"✅ Bought {quantity} of {symbol} at {price}")
+
+            # ✅ Implement Stop-Loss and Take-Profit Orders
+            stop_loss_price = round(price * (1 - STOP_LOSS_PERCENT), 2)
+            take_profit_price = round(price * (1 + TAKE_PROFIT_PERCENT), 2)
+
+            alpaca.submit_order(
+                symbol=symbol, qty=quantity, side="sell", type="stop", stop_price=stop_loss_price, time_in_force="gtc"
+            )
+            alpaca.submit_order(
+                symbol=symbol, qty=quantity, side="sell", type="limit", limit_price=take_profit_price, time_in_force="gtc"
+            )
+
             log_trade(symbol, "BUY", quantity, price, reason)
+        
         elif "SELL" in decision:
-            alpaca.submit_order(symbol=symbol, qty=quantity, side="sell", type="market", time_in_force="gtc")
-            print(f"✅ Sold {quantity} of {symbol}")
+            alpaca.submit_order(
+                symbol=symbol, qty=quantity, side="sell", type="market", time_in_force="gtc"
+            )
+            print(f"✅ Sold {quantity} of {symbol} at {price}")
             log_trade(symbol, "SELL", quantity, price, reason)
+        
         else:
             print(f"⏸️ Holding position for {symbol}")
             log_trade(symbol, "HOLD", 0, price, reason)
+
     except Exception as e:
         print(f"❌ Error executing trade for {symbol}: {e}")
+
 
 # ✅ Main Loop
 def main():
