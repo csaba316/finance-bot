@@ -112,7 +112,6 @@ def fetch_crypto_data(symbol, retries=3):
             time.sleep(2)
 
     return None
-
         
 # ✅ Calculate RSI
 def calculate_rsi(data, window=14):
