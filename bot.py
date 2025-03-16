@@ -254,14 +254,15 @@ def execute_trade(symbol, decision, price, reason):
         # ✅ Fetch Alpaca account balance
         account = alpaca.get_account()
         buying_power = float(account.buying_power)
-
+        
+        
         if "BUY" in decision:
             # ✅ Calculate trade amount (5% of available capital)
             trade_amount = min(buying_power * CAPITAL_ALLOCATION, float(account.cash))
-
-            if trade_amount < 10:
-                print(f"❌ Trade amount for {symbol} is below Alpaca's minimum ($10). Skipping trade...")
-                return
+                
+                if trade_amount < 10:
+                    print(f"❌ Trade amount for {symbol} is below Alpaca's minimum ($10). Skipping trade...")
+                    return
 
             # ✅ Calculate quantity
             quantity = round(trade_amount / price, 6)
@@ -278,9 +279,9 @@ def execute_trade(symbol, decision, price, reason):
                 alpaca.submit_order(
                     symbol=symbol,
                     qty=quantity,
-                    side="buy",
+                    side="sell",
                     type="market",
-                    time_in_force=time_in_force
+                    time_in_force="day"  # ✅ Change from "gtc" to "day"
                 )
                 print(f"✅ Bought {quantity} of {symbol} at ${price:.2f} (Order Type: {time_in_force})")
                 log_trade(symbol, "BUY", quantity, price, reason)
@@ -335,11 +336,13 @@ def main():
     while True:
         for asset in ASSETS:
             print(f"📊 Fetching data for {asset}...")
+            price_data = fetch_crypto_data(asset) if asset in ["BTC-USD", "ETH-USD"] else fetch_asset_data(asset)
             price = 0
 
             if asset in ["BTC-USD", "ETH-USD"]:
-                price_data = fetch_crypto_data(asset)
-
+                trade_amount = min(buying_power * 0.05, float(account.cash))
+                quantity = round(trade_amount / price, 6)
+                
                 if price_data is None or price_data.empty:
                     print(f"❌ Failed to fetch price for {asset}")
                     continue  
