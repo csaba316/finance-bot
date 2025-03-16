@@ -291,12 +291,12 @@ def main():
             if asset in ["BTC-USD", "ETH-USD"]:
                 price_data = fetch_crypto_data(asset)
 
-                # ✅ Corrected: Check if price_data is None or Empty
+                # ✅ Ensure price_data is valid and contains data
                 if price_data is None or price_data.empty:
                     print(f"❌ Failed to fetch price for {asset}")
-                    continue  # Skip this asset
+                    continue  
 
-                price = price_data["Close"].iloc[-1]  # Get the latest closing price
+                price = float(price_data["Close"].iloc[-1])  # ✅ Convert to float
                 print(f"💰 {asset} Price: ${price:.2f}")
 
             else:
@@ -307,7 +307,11 @@ def main():
                 
                 latest_data = stock_data.iloc[-1].to_dict()
                 price = latest_data.get('Close', 0)
-                if price == 0:
+
+                # ✅ Ensure price is a valid float
+                if isinstance(price, pd.Series):
+                    price = float(price.iloc[-1])
+                elif price == 0 or price is None:
                     print(f"❌ Price data unavailable for {asset}")
                     continue
 
