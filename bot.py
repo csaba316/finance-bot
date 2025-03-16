@@ -263,7 +263,7 @@ def execute_trade(symbol, decision, price, reason):
                 print(f"❌ Trade amount for {symbol} is below Alpaca's minimum ($10). Skipping trade...")
                 return
 
-            # ✅ Calculate quantity (rounded for fractional shares & crypto)
+            # ✅ Calculate quantity
             quantity = round(trade_amount / price, 6)
 
             if quantity <= 0:
@@ -341,9 +341,14 @@ def main():
                     print(f"❌ Failed to fetch price for {asset}")
                     continue  
     
-                # ✅ Corrected `float()` conversion
-                price = float(price_data["Close"].iloc[-1]) if isinstance(price_data["Close"], pd.Series) and not price_data.empty else 0.0
-    
+                # ✅ Ensure valid price (skip if 0 or NaN)
+                price = price_data["Close"].iloc[-1]
+                if isinstance(price, pd.Series):
+                    price = price.iloc[-1]
+                if pd.isna(price) or price <= 0:
+                    print(f"❌ Invalid price for {asset}. Skipping trade...")
+                    continue
+                price = float(price)
                 print(f"💰 {asset} Price: ${price:.2f}")
 
             else:
