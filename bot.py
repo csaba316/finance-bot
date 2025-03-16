@@ -234,51 +234,49 @@ def log_trade(symbol, action, quantity, price, reason):
 # ✅ Execute Trade
 def execute_trade(symbol, decision, price):
     try:
-        clock = alpaca.get_clock()
-        if symbol not in ["BTC-USD", "ETH-USD"] and not clock.is_open:
-            print(f"⏸️ Market is closed. Logging trade for {symbol}.")
-            log_trade(symbol, "SKIPPED", 0, price, "Market Closed")
-            return
+        # ✅ Convert crypto symbols for Alpaca API
+        crypto_symbol_map = {
+            "BTC-USD": "BTC/USD",
+            "ETH-USD": "ETH/USD"
+        }
+        alpaca_symbol = crypto_symbol_map.get(symbol, symbol)  # Convert if crypto
+
+        # ✅ Check if trading crypto
+        is_crypto = alpaca_symbol in ["BTC/USD", "ETH/USD"]
+
+        # ✅ Stock market check (not needed for crypto)
+        if not is_crypto:
+            clock = alpaca.get_clock()
+            if not clock.is_open:
+                print(f"⏸️ Market closed. Queueing trade for {symbol}.")
+                queue_trade(symbol, decision, price, "Market Closed")
+                return
         
+        # ✅ Get account buying power
         account = alpaca.get_account()
         buying_power = float(account.buying_power)
-        trade_amount = buying_power * CAPITAL_ALLOCATION
+        trade_amount = buying_power * 0.05  # 5% capital allocation
         quantity = round(trade_amount / price, 6)
 
         reason = decision.split("REASON:")[1].strip() if "REASON:" in decision else decision
 
         if "BUY" in decision and quantity > 0:
-            order = alpaca.submit_order(
-                symbol=symbol, qty=quantity, side="buy", type="market", time_in_force="gtc"
-            )
-            print(f"✅ Bought {quantity} of {symbol} at {price}")
+            alpaca.submit_order(symbol=alpaca_symbol, qty=quantity, side="buy", type="market", time_in_force="gtc")
+            print(f"✅ Bought {quantity} of {alpaca_symbol}")
+            log_trade(alpaca_symbol, "BUY", quantity, price, reason)
 
-            # ✅ Implement Stop-Loss and Take-Profit Orders
-            stop_loss_price = round(price * (1 - STOP_LOSS_PERCENT), 2)
-            take_profit_price = round(price * (1 + TAKE_PROFIT_PERCENT), 2)
-
-            alpaca.submit_order(
-                symbol=symbol, qty=quantity, side="sell", type="stop", stop_price=stop_loss_price, time_in_force="gtc"
-            )
-            alpaca.submit_order(
-                symbol=symbol, qty=quantity, side="sell", type="limit", limit_price=take_profit_price, time_in_force="gtc"
-            )
-
-            log_trade(symbol, "BUY", quantity, price, reason)
-        
         elif "SELL" in decision:
-            alpaca.submit_order(
-                symbol=symbol, qty=quantity, side="sell", type="market", time_in_force="gtc"
-            )
-            print(f"✅ Sold {quantity} of {symbol} at {price}")
-            log_trade(symbol, "SELL", quantity, price, reason)
-        
+            alpaca.submit_order(symbol=alpaca_symbol, qty=quantity, side="sell", type="market", time_in_force="gtc")
+            print(f"✅ Sold {quantity} of {alpaca_symbol}")
+            log_trade(alpaca_symbol, "SELL", quantity, price, reason)
+
         else:
-            print(f"⏸️ Holding position for {symbol}")
-            log_trade(symbol, "HOLD", 0, price, reason)
+            print(f"⏸️ Holding position for {alpaca_symbol}")
+            log_trade(alpaca_symbol, "HOLD", 0, price, reason)
 
     except Exception as e:
         print(f"❌ Error executing trade for {symbol}: {e}")
+
 
 
 # ✅ Main Loop
