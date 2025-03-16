@@ -290,9 +290,9 @@ def execute_trade(symbol, decision, price):
                 print(f"❌ Trade quantity too small for {symbol}. Skipping trade...")
                 return
         
-    alpaca.submit_order(symbol=alpaca_symbol, qty=quantity, side="buy", type="market", time_in_force="gtc")
-    print(f"✅ Bought {quantity} of {alpaca_symbol}")
-    log_trade(alpaca_symbol, "BUY", quantity, price, reason)
+            alpaca.submit_order(symbol=alpaca_symbol, qty=quantity, side="buy", type="market", time_in_force="gtc")
+            print(f"✅ Bought {quantity} of {alpaca_symbol}")
+            log_trade(alpaca_symbol, "BUY", quantity, price, reason)
 
 
         elif "SELL" in decision:
