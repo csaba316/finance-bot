@@ -178,14 +178,20 @@ def analyze_with_chatgpt(data):
     """
 
     try:
-        # ✅ Create a thread first
+        # ✅ Create a new thread for conversation
         thread = client.beta.threads.create()
+
+        # ✅ Add user message to the thread
+        client.beta.threads.messages.create(
+            thread_id=thread.id,
+            role="user",
+            content=prompt
+        )
 
         # ✅ Run the assistant on that thread
         run = client.beta.threads.runs.create(
             thread_id=thread.id,
-            assistant_id=ZAPIER_ASSISTANT_ID,
-            parameters={"messages": [{"role": "user", "content": prompt}]}
+            assistant_id=ZAPIER_ASSISTANT_ID
         )
 
         # ✅ Wait for the response to be generated
