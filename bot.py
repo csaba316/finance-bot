@@ -244,68 +244,73 @@ def queue_trade(symbol, decision, price, reason):
     print(f"📋 Trade queued: {trade_data}")
 
 # ✅ Execute Trade
-def execute_trade(symbol, decision, price):
+def execute_trade(symbol, decision, price, reason):
+    """Executes a trade based on the decision from ChatGPT."""
     try:
-        # ✅ Convert crypto symbols for Alpaca API
-        crypto_symbol_map = {
-            "BTC-USD": "BTC/USD",
-            "ETH-USD": "ETH/USD"
-        }
-        alpaca_symbol = crypto_symbol_map.get(symbol, symbol)  # Convert if crypto
+        # ✅ Ensure price is valid
+        if price <= 0:
+            print(f"❌ Invalid price for {symbol}. Skipping trade...")
+            return
 
-        # ✅ Check if trading crypto
-        is_crypto = alpaca_symbol in ["BTC/USD", "ETH/USD"]
-
-        # ✅ Stock market check (not needed for crypto)
-        if not is_crypto:
-            clock = alpaca.get_clock()
-            if not clock.is_open:
-                print(f"⏸️ Market closed. Queueing trade for {symbol}.")
-                queue_trade(symbol, decision, price, "Market Closed")  # ✅ Now correctly defined
-                return
-        
-        # ✅ Get account buying power
+        # ✅ Fetch account balance
         account = alpaca.get_account()
         buying_power = float(account.buying_power)
-        # ✅ Ensure trade does not exceed available cash balance
-        trade_amount = min(buying_power * 0.05, float(account.cash))  
-
-        quantity = round(trade_amount / price, 6)
-
-        reason = decision.split("REASON:")[1].strip() if "REASON:" in decision else decision
 
         if "BUY" in decision:
-            # ✅ Ensure trade does not exceed available cash balance
+            # ✅ Calculate trade amount (5% of capital, ensuring it doesn't exceed available cash)
             trade_amount = min(buying_power * 0.05, float(account.cash))
-    
+
             # ✅ Ensure trade amount is at least $10 (Alpaca's minimum)
             if trade_amount < 10:
                 print(f"❌ Trade amount for {symbol} is below Alpaca's minimum ($10). Skipping trade...")
                 return
-    
-            # ✅ Calculate quantity and ensure it is positive
-            quantity = max(round(trade_amount / price, 6), 0.000001)  
+
+            # ✅ Calculate quantity and ensure it's valid
+            quantity = round(trade_amount / price, 6)
 
             if quantity <= 0:
                 print(f"❌ Trade quantity too small for {symbol}. Skipping trade...")
                 return
-        
-            alpaca.submit_order(symbol=alpaca_symbol, qty=quantity, side="buy", type="market", time_in_force="gtc")
-            print(f"✅ Bought {quantity} of {alpaca_symbol}")
-            log_trade(alpaca_symbol, "BUY", quantity, price, reason)
 
+            # ✅ Execute order with error handling
+            try:
+                alpaca.submit_order(symbol=symbol, qty=quantity, side="buy", type="market", time_in_force="gtc")
+                print(f"✅ Bought {quantity} of {symbol} at ${price:.2f}")
+                log_trade(symbol, "BUY", quantity, price, reason)
+            except Exception as e:
+                print(f"❌ Error executing trade for {symbol}: {e}")
 
         elif "SELL" in decision:
-            alpaca.submit_order(symbol=alpaca_symbol, qty=quantity, side="sell", type="market", time_in_force="gtc")
-            print(f"✅ Sold {quantity} of {alpaca_symbol}")
-            log_trade(alpaca_symbol, "SELL", quantity, price, reason)
+            # ✅ Fetch position details
+            try:
+                position = alpaca.get_position(symbol)
+                available_qty = float(position.qty)
 
-        else:
-            print(f"⏸️ Holding position for {alpaca_symbol}")
-            log_trade(alpaca_symbol, "HOLD", 0, price, reason)
+                if available_qty <= 0:
+                    print(f"❌ No available shares of {symbol} to sell. Skipping trade...")
+                    return
+
+                # ✅ Sell entire position (or partial, based on strategy)
+                quantity = available_qty
+
+                # ✅ Ensure minimum order size
+                if quantity * price < 10:
+                    print(f"❌ Trade amount for {symbol} is below Alpaca's minimum ($10). Skipping trade...")
+                    return
+
+                # ✅ Execute order with error handling
+                try:
+                    alpaca.submit_order(symbol=symbol, qty=quantity, side="sell", type="market", time_in_force="gtc")
+                    print(f"✅ Sold {quantity} of {symbol} at ${price:.2f}")
+                    log_trade(symbol, "SELL", quantity, price, reason)
+                except Exception as e:
+                    print(f"❌ Error executing trade for {symbol}: {e}")
+
+            except Exception as e:
+                print(f"❌ Error fetching position for {symbol}: {e}")
 
     except Exception as e:
-        print(f"❌ Error executing trade for {symbol}: {e}")
+        print(f"❌ Unexpected error in execute_trade(): {e}")
 
 
 
@@ -324,7 +329,7 @@ def main():
                     print(f"❌ Failed to fetch price for {asset}")
                     continue  
 
-                price = float(price_data["Close"].iloc[-1]) if not price_data["Close"].empty else 0.0
+                price = float(price_data["Close"].iloc[-1]) if not price_data.empty else 0.0
 
                 print(f"💰 {asset} Price: ${price:.2f}")
 
