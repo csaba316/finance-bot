@@ -84,10 +84,13 @@ def fetch_crypto_data(symbol):
         # ✅ Fetch last 7 days of data with 1-hour intervals
         crypto_data = yf.download(yahoo_symbol, period="7d", interval="1h", auto_adjust=True, prepost=True)
 
-        if crypto_data.empty or crypto_data["Close"].isna().all():
+        # ✅ Properly check if data is empty
+        if crypto_data.empty:
             raise ValueError(f"❌ No valid crypto data for {symbol}")
 
-        crypto_data = crypto_data.ffill().dropna()  # Fill missing data
+        # ✅ Forward-fill missing values and drop remaining NaN rows
+        crypto_data = crypto_data.ffill().dropna()
+
         return calculate_indicators(crypto_data)
 
     except Exception as e:
