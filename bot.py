@@ -175,15 +175,25 @@ def analyze_with_chatgpt(data):
     SMA50: {data.get('SMA_50', 'N/A')}, SMA200: {data.get('SMA_200', 'N/A')},
     EMA9: {data.get('EMA_9', 'N/A')}, EMA21: {data.get('EMA_21', 'N/A')},
     MACD: {data.get('MACD', 'N/A')}, MACD Signal: {data.get('MACD_Signal', 'N/A')},
-    Upper Band: {data.get('Upper_Band', 'N/A')}, Lower Band: {data.get('Lower_Band', 'N/A')},
-    VWAP: {data.get('VWAP', 'N/A')}.
+    VWAP: {data.get('VWAP', 'N/A')},
+    Upper Band: {data.get('Upper_Band', 'N/A')}, Lower Band: {data.get('Lower_Band', 'N/A')}.
 
-    - If EMA9 crosses above EMA21, MACD is above the signal line, and RSI is above 50, it's a strong buy signal.
-    - If EMA9 crosses below EMA21, MACD is below the signal line, and RSI is below 50, it's a strong sell signal.
-    - Otherwise, hold.
+    **Decision Rules:**
+    - **BUY when:**
+      - EMA9 crosses **above** EMA21.
+      - MACD is **above** the signal line.
+      - RSI is between **50-70**.
+      - Price is **above VWAP**.
+      - Price is **near Lower Band**, signaling a potential reversal.
+    - **SELL when:**
+      - EMA9 crosses **below** EMA21.
+      - MACD is **below** the signal line.
+      - RSI is **above 70** (overbought).
+      - Price is **near Upper Band**, indicating potential pullback.
+    - **HOLD if:** Indicators conflict or are inconclusive.
 
     Format response strictly as:
-    "DECISION: [BUY/SELL/HOLD]. REASON: [SHORT REASON]"
+    "DECISION: [BUY/SELL/HOLD]. REASON: [SHORT EXPLANATION]"
     """
 
     try:
