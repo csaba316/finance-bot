@@ -81,33 +81,38 @@ def fetch_crypto_data(symbol, retries=3):
         print(f"❌ Unsupported crypto symbol: {symbol}")
         return None
 
-    # ✅ Fetch historical prices
-    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart?vs_currency=usd&days=7&interval=hourly"
+    # ✅ Primary: CoinGecko API
+    coingecko_url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart?vs_currency=usd&days=7&interval=hourly"
+
+    # ✅ Backup: Binance API (More Reliable)
+    binance_symbol = symbol.replace("-USD", "USDT")  # Convert BTC-USD to BTCUSDT
+    binance_url = f"https://api.binance.com/api/v3/klines?symbol={binance_symbol}&interval=1h&limit=168"  # Last 7 days
 
     for attempt in range(retries):
         try:
-            response = requests.get(url, timeout=10).json()
-            if "prices" not in response:
-                raise ValueError(f"❌ No historical crypto data for {symbol}")
+            # ✅ Try CoinGecko First
+            response = requests.get(coingecko_url, timeout=10).json()
+            if "prices" in response:
+                df = pd.DataFrame(response["prices"], columns=["timestamp", "Close"])
+                df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+                df.set_index("timestamp", inplace=True)
+                return calculate_indicators(df)
 
-            # ✅ Convert response to DataFrame
-            df = pd.DataFrame(response["prices"], columns=["timestamp", "Close"])
-            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
-            df.set_index("timestamp", inplace=True)
-
-            # ✅ Ensure we have enough data
-            if df.empty or df["Close"].isna().all():
-                raise ValueError(f"❌ No valid historical crypto data for {symbol}")
-
-            # ✅ Calculate indicators for crypto
-            df = calculate_indicators(df)
-            return df
+            # ✅ If CoinGecko Fails, Try Binance
+            response = requests.get(binance_url, timeout=10).json()
+            if isinstance(response, list):
+                df = pd.DataFrame(response, columns=["timestamp", "Open", "High", "Low", "Close", "Volume", "CloseTime", "QuoteAssetVolume", "Trades", "TakerBuyBase", "TakerBuyQuote", "Ignore"])
+                df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+                df["Close"] = df["Close"].astype(float)
+                df.set_index("timestamp", inplace=True)
+                return calculate_indicators(df)
 
         except Exception as e:
             print(f"❌ Attempt {attempt+1} error fetching crypto data for {symbol}: {e}")
             time.sleep(2)
 
     return None
+
         
 # ✅ Calculate RSI
 def calculate_rsi(data, window=14):
@@ -178,19 +183,18 @@ def analyze_with_chatgpt(data):
     VWAP: {data.get('VWAP', 'N/A')},
     Upper Band: {data.get('Upper_Band', 'N/A')}, Lower Band: {data.get('Lower_Band', 'N/A')}.
 
-    **Decision Rules:**
-    - **BUY when:**
-      - EMA9 crosses **above** EMA21.
-      - MACD is **above** the signal line.
-      - RSI is between **50-70**.
-      - Price is **above VWAP**.
-      - Price is **near Lower Band**, signaling a potential reversal.
-    - **SELL when:**
-      - EMA9 crosses **below** EMA21.
-      - MACD is **below** the signal line.
-      - RSI is **above 70** (overbought).
-      - Price is **near Upper Band**, indicating potential pullback.
-    - **HOLD if:** Indicators conflict or are inconclusive.
+    **Revised Trade Strategy:**
+    - **BUY when:**  
+      - EMA9 **crosses above** EMA21 **AND** MACD is **above the signal line**, OR  
+      - RSI is **between 50-65** AND price is **above VWAP** AND **near Lower Band**.  
+      - If 2 or more of these conditions align, it’s a strong BUY signal.  
+
+    - **SELL when:**  
+      - EMA9 **crosses below** EMA21 **AND** MACD is **below the signal line**, OR  
+      - RSI is **above 70** (overbought) **AND** price is **near Upper Band**.  
+      - If 2 or more of these conditions align, it’s a strong SELL signal.  
+
+    - **HOLD only if:** Indicators conflict or there is **NO strong buy/sell signal**.
 
     Format response strictly as:
     "DECISION: [BUY/SELL/HOLD]. REASON: [SHORT EXPLANATION]"
