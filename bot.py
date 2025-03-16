@@ -246,6 +246,14 @@ def queue_trade(symbol, decision, price, reason):
 # ✅ Execute Trade
 def execute_trade(symbol, decision, price, reason):
     """Executes a trade based on the decision from ChatGPT."""
+    # ✅ Check if the market is open before executing a stock trade
+    clock = alpaca.get_clock()
+    market_open = clock.is_open
+
+    if not market_open and symbol not in ["BTC-USD", "ETH-USD"]:
+        print(f"⏳ Market is closed. Skipping trade for {symbol}.")
+        return
+        
     try:
         if price <= 0:
             print(f"❌ Invalid price for {symbol}. Skipping trade...")
@@ -289,12 +297,12 @@ def execute_trade(symbol, decision, price, reason):
 
         elif "SELL" in decision:
             try:
-                position = alpaca.get_position(symbol)
+                position = alpaca.get_position(symbol)  # Get current holdings
                 available_qty = float(position.qty)
 
                 if available_qty <= 0:
                     print(f"❌ No available shares of {symbol} to sell. Skipping trade...")
-                    return
+                    return  # 🚀 Prevents unnecessary errors
 
                 quantity = available_qty
                 if quantity * price < 10:
@@ -303,7 +311,6 @@ def execute_trade(symbol, decision, price, reason):
 
                 time_in_force = "day" if quantity < 1 else "gtc"
 
-                # ✅ Execute sell order safely
                 try:
                     alpaca.submit_order(
                         symbol=symbol,
