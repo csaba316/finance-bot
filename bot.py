@@ -230,6 +230,18 @@ def log_trade(symbol, action, quantity, price, reason):
     df.to_csv("trade_log.csv", mode='a', header=not os.path.exists("trade_log.csv"), index=False)
     print(f"📜 Trade logged: {trade_data}")
 
+def queue_trade(symbol, decision, price, reason):
+    trade_data = {
+        "Date": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "Symbol": symbol,
+        "Action": "QUEUED",
+        "Quantity": 0,
+        "Price": price,
+        "Reason": reason
+    }
+    df = pd.DataFrame([trade_data])
+    df.to_csv("queued_trades.csv", mode='a', header=not os.path.exists("queued_trades.csv"), index=False)
+    print(f"📋 Trade queued: {trade_data}")
 
 # ✅ Execute Trade
 def execute_trade(symbol, decision, price):
@@ -249,7 +261,7 @@ def execute_trade(symbol, decision, price):
             clock = alpaca.get_clock()
             if not clock.is_open:
                 print(f"⏸️ Market closed. Queueing trade for {symbol}.")
-                queue_trade(symbol, decision, price, "Market Closed")
+                queue_trade(symbol, decision, price, "Market Closed")  # ✅ Now correctly defined
                 return
         
         # ✅ Get account buying power
