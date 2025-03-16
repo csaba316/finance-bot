@@ -256,26 +256,32 @@ def execute_trade(symbol, decision, price, reason):
         buying_power = float(account.buying_power)
 
         if "BUY" in decision:
-            # ✅ Calculate trade amount (5% of capital, ensuring it doesn’t exceed available cash)
+            # ✅ Calculate trade amount (5% of available capital)
             trade_amount = min(buying_power * CAPITAL_ALLOCATION, float(account.cash))
 
             if trade_amount < 10:
                 print(f"❌ Trade amount for {symbol} is below Alpaca's minimum ($10). Skipping trade...")
                 return
 
-            # ✅ Calculate quantity (rounded to 6 decimals for crypto & fractional shares)
+            # ✅ Calculate quantity (rounded for fractional shares & crypto)
             quantity = round(trade_amount / price, 6)
 
             if quantity <= 0:
                 print(f"❌ Trade quantity too small for {symbol}. Skipping trade...")
                 return
 
-            # ✅ Set `time_in_force="day"` for fractional orders
+            # ✅ Force `time_in_force="day"` for fractional orders
             time_in_force = "day" if quantity < 1 else "gtc"
 
             # ✅ Execute trade
             try:
-                alpaca.submit_order(symbol=symbol, qty=quantity, side="buy", type="market", time_in_force=time_in_force)
+                alpaca.submit_order(
+                    symbol=symbol,
+                    qty=quantity,
+                    side="buy",
+                    type="market",
+                    time_in_force=time_in_force
+                )
                 print(f"✅ Bought {quantity} of {symbol} at ${price:.2f} (Order Type: {time_in_force})")
                 log_trade(symbol, "BUY", quantity, price, reason)
             except Exception as e:
@@ -297,12 +303,18 @@ def execute_trade(symbol, decision, price, reason):
                     print(f"❌ Trade amount for {symbol} is below Alpaca's minimum ($10). Skipping trade...")
                     return
 
-                # ✅ Set `time_in_force="day"` for fractional orders
+                # ✅ Force `time_in_force="day"` for fractional orders
                 time_in_force = "day" if quantity < 1 else "gtc"
 
                 # ✅ Execute sell order
                 try:
-                    alpaca.submit_order(symbol=symbol, qty=quantity, side="sell", type="market", time_in_force=time_in_force)
+                    alpaca.submit_order(
+                        symbol=symbol,
+                        qty=quantity,
+                        side="sell",
+                        type="market",
+                        time_in_force=time_in_force
+                    )
                     print(f"✅ Sold {quantity} of {symbol} at ${price:.2f} (Order Type: {time_in_force})")
                     log_trade(symbol, "SELL", quantity, price, reason)
                 except Exception as e:
@@ -328,8 +340,10 @@ def main():
                 if price_data is None or price_data.empty:
                     print(f"❌ Failed to fetch price for {asset}")
                     continue  
-
-                price = float(price_data["Close"].iloc[-1]) if not price_data["Close"].empty else 0.0
+    
+                # ✅ Corrected `float()` conversion
+                price = float(price_data["Close"].iloc[-1]) if isinstance(price_data["Close"], pd.Series) and not price_data.empty else 0.0
+    
                 print(f"💰 {asset} Price: ${price:.2f}")
 
             else:
