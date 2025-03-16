@@ -260,20 +260,24 @@ def execute_trade(symbol, decision, price, reason):
             trade_amount = min(buying_power * CAPITAL_ALLOCATION, float(account.cash))
 
             if trade_amount < 10:
-                print(f"❌ Trade amount for {symbol} is below Alpaca's minimum ($10). Skipping trade...")
-                return
+                print(f"⚠️ Trade amount for {symbol} is below $10. Adjusting allocation dynamically...")
+                trade_amount = max(10, buying_power * 0.1)  # Increase allocation to 10%
 
-            # ✅ Calculate quantity and ensure it's valid
+
+            # ✅ Calculate quantity (rounded to 6 decimals for crypto & fractional shares)
             quantity = round(trade_amount / price, 6)
 
             if quantity <= 0:
                 print(f"❌ Trade quantity too small for {symbol}. Skipping trade...")
                 return
 
+            # ✅ Set `time_in_force="day"` for fractional orders
+            time_in_force = "day" if quantity < 1 else "gtc"
+
             # ✅ Execute trade
             try:
-                alpaca.submit_order(symbol=symbol, qty=quantity, side="buy", type="market", time_in_force="gtc")
-                print(f"✅ Bought {quantity} of {symbol} at ${price:.2f}")
+                alpaca.submit_order(symbol=symbol, qty=quantity, side="buy", type="market", time_in_force=time_in_force)
+                print(f"✅ Bought {quantity} of {symbol} at ${price:.2f} (Order Type: {time_in_force})")
                 log_trade(symbol, "BUY", quantity, price, reason)
             except Exception as e:
                 print(f"❌ Error executing trade for {symbol}: {e}")
@@ -287,17 +291,20 @@ def execute_trade(symbol, decision, price, reason):
                     print(f"❌ No available shares of {symbol} to sell. Skipping trade...")
                     return
 
-                # ✅ Sell entire position (or partial, based on strategy)
+                # ✅ Sell entire position
                 quantity = available_qty
 
                 if quantity * price < 10:
                     print(f"❌ Trade amount for {symbol} is below Alpaca's minimum ($10). Skipping trade...")
                     return
 
+                # ✅ Set `time_in_force="day"` for fractional orders
+                time_in_force = "day" if quantity < 1 else "gtc"
+
                 # ✅ Execute sell order
                 try:
-                    alpaca.submit_order(symbol=symbol, qty=quantity, side="sell", type="market", time_in_force="gtc")
-                    print(f"✅ Sold {quantity} of {symbol} at ${price:.2f}")
+                    alpaca.submit_order(symbol=symbol, qty=quantity, side="sell", type="market", time_in_force=time_in_force)
+                    print(f"✅ Sold {quantity} of {symbol} at ${price:.2f} (Order Type: {time_in_force})")
                     log_trade(symbol, "SELL", quantity, price, reason)
                 except Exception as e:
                     print(f"❌ Error executing trade for {symbol}: {e}")
