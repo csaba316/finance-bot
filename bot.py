@@ -251,42 +251,38 @@ def execute_trade(symbol, decision, price, reason):
             print(f"❌ Invalid price for {symbol}. Skipping trade...")
             return
 
-        # ✅ Fetch Alpaca account balance
+        # ✅ Fetch Alpaca account balance before using it
         account = alpaca.get_account()
         buying_power = float(account.buying_power)
-        
-        
+        quantity = 0  # Ensure quantity is always defined
+
         if "BUY" in decision:
-            # ✅ Calculate trade amount (5% of available capital)
             trade_amount = min(buying_power * CAPITAL_ALLOCATION, float(account.cash))
-                
-            if trade_amount < 10:
+
+            if trade_amount < 10:  # ✅ Alpaca's minimum trade amount check
                 print(f"❌ Trade amount for {symbol} is below Alpaca's minimum ($10). Skipping trade...")
                 return
 
-            # ✅ Calculate quantity
             quantity = round(trade_amount / price, 6)
-
             if quantity <= 0:
                 print(f"❌ Trade quantity too small for {symbol}. Skipping trade...")
                 return
 
-            # ✅ Force `time_in_force="day"` for fractional orders
             time_in_force = "day" if quantity < 1 else "gtc"
 
-            # ✅ Execute trade
+            # ✅ Execute buy order safely
             try:
                 alpaca.submit_order(
                     symbol=symbol,
                     qty=quantity,
-                    side="sell",
+                    side="buy",
                     type="market",
-                    time_in_force="day"  # ✅ Change from "gtc" to "day"
+                    time_in_force=time_in_force
                 )
                 print(f"✅ Bought {quantity} of {symbol} at ${price:.2f} (Order Type: {time_in_force})")
                 log_trade(symbol, "BUY", quantity, price, reason)
             except Exception as e:
-                print(f"❌ Error executing trade for {symbol}: {e}")
+                print(f"❌ Error executing BUY trade for {symbol}: {e}")
 
         elif "SELL" in decision:
             try:
@@ -297,17 +293,14 @@ def execute_trade(symbol, decision, price, reason):
                     print(f"❌ No available shares of {symbol} to sell. Skipping trade...")
                     return
 
-                # ✅ Sell entire position
                 quantity = available_qty
-
                 if quantity * price < 10:
                     print(f"❌ Trade amount for {symbol} is below Alpaca's minimum ($10). Skipping trade...")
                     return
 
-                # ✅ Force `time_in_force="day"` for fractional orders
                 time_in_force = "day" if quantity < 1 else "gtc"
 
-                # ✅ Execute sell order
+                # ✅ Execute sell order safely
                 try:
                     alpaca.submit_order(
                         symbol=symbol,
@@ -319,64 +312,57 @@ def execute_trade(symbol, decision, price, reason):
                     print(f"✅ Sold {quantity} of {symbol} at ${price:.2f} (Order Type: {time_in_force})")
                     log_trade(symbol, "SELL", quantity, price, reason)
                 except Exception as e:
-                    print(f"❌ Error executing trade for {symbol}: {e}")
+                    print(f"❌ Error executing SELL trade for {symbol}: {e}")
                     log_trade(symbol, "FAILED", quantity, price, reason)
-                    print(f"⚠️ Trade failed for {symbol}. Reason: {reason}")
 
             except Exception as e:
                 print(f"❌ Error fetching position for {symbol}: {e}")
-                
+
         print(f"🔄 Attempting {decision} of {quantity} {symbol} at ${price:.2f} (Order Type: {time_in_force})")
+    
     except Exception as e:
         print(f"❌ Unexpected error in execute_trade(): {e}")
-
 
 # ✅ Main Loop
 def main():
     while True:
+        # ✅ Fetch Alpaca account data first
+        try:
+            account = alpaca.get_account()
+            buying_power = float(account.buying_power)
+        except Exception as e:
+            print(f"❌ Error fetching account data: {e}")
+            return
+
         for asset in ASSETS:
             print(f"📊 Fetching data for {asset}...")
             price_data = fetch_crypto_data(asset) if asset in ["BTC-USD", "ETH-USD"] else fetch_asset_data(asset)
-            price = 0
 
-            if asset in ["BTC-USD", "ETH-USD"]:
-                trade_amount = min(buying_power * 0.05, float(account.cash))
-                quantity = round(trade_amount / price, 6)
-                
-                if price_data is None or price_data.empty:
-                    print(f"❌ Failed to fetch price for {asset}")
-                    continue  
-    
-                # ✅ Ensure valid price (skip if 0 or NaN)
-                price = price_data["Close"].iloc[-1]
-                if isinstance(price, pd.Series):
-                    price = price.iloc[-1]
-                if pd.isna(price) or price <= 0:
-                    print(f"❌ Invalid price for {asset}. Skipping trade...")
-                    continue
-                price = float(price)
-                print(f"💰 {asset} Price: ${price:.2f}")
+            if price_data is None or price_data.empty:
+                print(f"❌ Failed to fetch price for {asset}")
+                continue  
 
-            else:
-                stock_data = fetch_asset_data(asset)
-                if stock_data is None or stock_data.empty:
-                    print(f"❌ No valid data for {asset}. Skipping...")
-                    continue
-                
-                latest_data = stock_data.iloc[-1].to_dict()
-                price = latest_data.get('Close', 0)
+            # ✅ Ensure valid price before proceeding
+            price = price_data["Close"].iloc[-1] if "Close" in price_data.columns else 0
+            if pd.isna(price) or price <= 0:
+                print(f"❌ Invalid price for {asset}. Skipping trade...")
+                continue
+            price = float(price)
 
-                if isinstance(price, pd.Series):
-                    price = float(price.iloc[-1])
-                elif price == 0 or price is None:
-                    print(f"❌ Price data unavailable for {asset}")
-                    continue
+            print(f"💰 {asset} Price: ${price:.2f}")
+
+            # ✅ Ensure trade amount is above Alpaca's minimum ($10)
+            trade_amount = min(buying_power * CAPITAL_ALLOCATION, float(account.cash))
+            if trade_amount < 10:
+                print(f"❌ Trade amount for {asset} is below Alpaca's minimum ($10). Skipping trade...")
+                continue
 
             # ✅ Get Decision and Extract Reason
+            latest_data = price_data.iloc[-1].to_dict()
             trade_decision = analyze_with_chatgpt(latest_data)
             print(f"📈 {asset} Decision: {trade_decision}")
 
-            # ✅ Extract "BUY/SELL/HOLD" and the reason from the response
+            # ✅ Extract "BUY/SELL/HOLD" and reason
             if "DECISION:" in trade_decision and "REASON:" in trade_decision:
                 decision_part = trade_decision.split("DECISION:")[1].strip()
                 decision, reason = decision_part.split("REASON:", 1)
@@ -386,7 +372,7 @@ def main():
                 decision = "HOLD"
                 reason = "Could not extract reason from response."
 
-            # ✅ Execute Trade
+            # ✅ Execute Trade Safely
             execute_trade(asset, decision, price, reason)
 
         print("⏳ Waiting 5 minutes before next check...")
