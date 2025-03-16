@@ -267,12 +267,19 @@ def execute_trade(symbol, decision, price):
         # ✅ Get account buying power
         account = alpaca.get_account()
         buying_power = float(account.buying_power)
-        trade_amount = buying_power * 0.05  # 5% capital allocation
+        # ✅ Ensure trade does not exceed available cash balance
+        trade_amount = min(buying_power * 0.05, float(account.cash))  
+
         quantity = round(trade_amount / price, 6)
 
         reason = decision.split("REASON:")[1].strip() if "REASON:" in decision else decision
 
         if "BUY" in decision and quantity > 0:
+        # ✅ Ensure enough funds are available
+        if trade_amount > float(account.cash):
+            print(f"❌ Insufficient balance for {symbol}. Available: ${account.cash}, Required: ${trade_amount}")
+            return
+
             alpaca.submit_order(symbol=alpaca_symbol, qty=quantity, side="buy", type="market", time_in_force="gtc")
             print(f"✅ Bought {quantity} of {alpaca_symbol}")
             log_trade(alpaca_symbol, "BUY", quantity, price, reason)
