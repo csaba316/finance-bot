@@ -260,9 +260,8 @@ def execute_trade(symbol, decision, price, reason):
             trade_amount = min(buying_power * CAPITAL_ALLOCATION, float(account.cash))
 
             if trade_amount < 10:
-                print(f"⚠️ Trade amount for {symbol} is below $10. Adjusting allocation dynamically...")
-                trade_amount = max(10, buying_power * 0.1)  # Increase allocation to 10%
-
+                print(f"❌ Trade amount for {symbol} is below Alpaca's minimum ($10). Skipping trade...")
+                return
 
             # ✅ Calculate quantity (rounded to 6 decimals for crypto & fractional shares)
             quantity = round(trade_amount / price, 6)
@@ -315,6 +314,7 @@ def execute_trade(symbol, decision, price, reason):
     except Exception as e:
         print(f"❌ Unexpected error in execute_trade(): {e}")
 
+
 # ✅ Main Loop
 def main():
     while True:
@@ -329,7 +329,7 @@ def main():
                     print(f"❌ Failed to fetch price for {asset}")
                     continue  
 
-                price = float(price_data["Close"].iloc[-1]) if not price_data.empty else 0.0
+                price = float(price_data["Close"].iloc[-1]) if not price_data["Close"].empty else 0.0
                 print(f"💰 {asset} Price: ${price:.2f}")
 
             else:
