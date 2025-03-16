@@ -73,44 +73,36 @@ def fetch_asset_data(symbol):
         return None
 
 # ✅ Improved Crypto Data Retrieval
-def fetch_crypto_data(symbol, retries=3):
-    coin_map = {"BTC-USD": "bitcoin", "ETH-USD": "ethereum"}
-    coin_id = coin_map.get(symbol, None)
-
-    if not coin_id:
-        print(f"❌ Unsupported crypto symbol: {symbol}")
-        return None
-
-    # ✅ Primary: CoinGecko API
-    coingecko_url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart?vs_currency=usd&days=7&interval=hourly"
-
-    # ✅ Backup: Binance API (More Reliable)
-    binance_symbol = symbol.replace("-USD", "USDT")  # Convert BTC-USD to BTCUSDT
-    binance_url = f"https://api.binance.com/api/v3/klines?symbol={binance_symbol}&interval=1h&limit=168"  # Last 7 days
+def fetch_crypto_data(symbol, retries=5):
+    binance_symbol = symbol.replace("-USD", "USDT")  # Convert BTC-USD → BTCUSDT
+    binance_candles_url = f"https://api.binance.com/api/v3/klines?symbol={binance_symbol}&interval=1h&limit=168"
+    binance_avg_url = f"https://api.binance.com/api/v3/avgPrice?symbol={binance_symbol}"  # Fallback if OHLC data fails
 
     for attempt in range(retries):
         try:
-            # ✅ Try CoinGecko First
-            response = requests.get(coingecko_url, timeout=10).json()
-            if "prices" in response:
-                df = pd.DataFrame(response["prices"], columns=["timestamp", "Close"])
-                df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
-                df.set_index("timestamp", inplace=True)
-                return calculate_indicators(df)
-
-            # ✅ If CoinGecko Fails, Try Binance
-            response = requests.get(binance_url, timeout=10).json()
-            if isinstance(response, list):
-                df = pd.DataFrame(response, columns=["timestamp", "Open", "High", "Low", "Close", "Volume", "CloseTime", "QuoteAssetVolume", "Trades", "TakerBuyBase", "TakerBuyQuote", "Ignore"])
+            # ✅ Try Binance OHLC Data First
+            response = requests.get(binance_candles_url, timeout=10)
+            if response.status_code == 200 and isinstance(response.json(), list):
+                data = response.json()
+                df = pd.DataFrame(data, columns=["timestamp", "Open", "High", "Low", "Close", "Volume", "CloseTime", 
+                                                 "QuoteAssetVolume", "Trades", "TakerBuyBase", "TakerBuyQuote", "Ignore"])
                 df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
                 df["Close"] = df["Close"].astype(float)
                 df.set_index("timestamp", inplace=True)
                 return calculate_indicators(df)
 
+            # ✅ If OHLC Fails, Use Binance Average Price API
+            response = requests.get(binance_avg_url, timeout=10)
+            if response.status_code == 200:
+                price = float(response.json().get("price", 0))
+                if price > 0:
+                    return pd.DataFrame({"Close": [price]}, index=[pd.Timestamp.now()])
+
         except Exception as e:
             print(f"❌ Attempt {attempt+1} error fetching crypto data for {symbol}: {e}")
-            time.sleep(2)
+            time.sleep(2 ** attempt)  # Exponential backoff
 
+    print(f"❌ Final failure: Could not fetch {symbol} price data.")
     return None
         
 # ✅ Calculate RSI
