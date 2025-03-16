@@ -319,10 +319,13 @@ def execute_trade(symbol, decision, price, reason):
                     log_trade(symbol, "SELL", quantity, price, reason)
                 except Exception as e:
                     print(f"❌ Error executing trade for {symbol}: {e}")
+                    log_trade(symbol, "FAILED", quantity, price, reason)
+                    print(f"⚠️ Trade failed for {symbol}. Reason: {reason}")
 
             except Exception as e:
                 print(f"❌ Error fetching position for {symbol}: {e}")
-
+                
+        print(f"🔄 Attempting {decision} of {quantity} {symbol} at ${price:.2f} (Order Type: {time_in_force})")
     except Exception as e:
         print(f"❌ Unexpected error in execute_trade(): {e}")
 
