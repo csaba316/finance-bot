@@ -81,24 +81,33 @@ def fetch_crypto_data(symbol, retries=3):
         print(f"❌ Unsupported crypto symbol: {symbol}")
         return None
 
-    url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd"
-    
+    # ✅ Fetch historical prices
+    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart?vs_currency=usd&days=7&interval=hourly"
+
     for attempt in range(retries):
         try:
             response = requests.get(url, timeout=10).json()
+            if "prices" not in response:
+                raise ValueError(f"❌ No historical crypto data for {symbol}")
 
-            # ✅ Ensure valid response structure
-            if not isinstance(response, dict) or coin_id not in response or 'usd' not in response.get(coin_id, {}):
-                raise ValueError(f"❌ No crypto data for {symbol}")
+            # ✅ Convert response to DataFrame
+            df = pd.DataFrame(response["prices"], columns=["timestamp", "Close"])
+            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+            df.set_index("timestamp", inplace=True)
 
-            return response[coin_id]['usd']
+            # ✅ Ensure we have enough data
+            if df.empty or df["Close"].isna().all():
+                raise ValueError(f"❌ No valid historical crypto data for {symbol}")
+
+            # ✅ Calculate indicators for crypto
+            df = calculate_indicators(df)
+            return df
 
         except Exception as e:
             print(f"❌ Attempt {attempt+1} error fetching crypto data for {symbol}: {e}")
             time.sleep(2)
-    
-    return None  # Return None if all attempts fail
 
+    return None
         
 # ✅ Calculate RSI
 def calculate_rsi(data, window=14):
