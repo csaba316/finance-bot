@@ -278,7 +278,9 @@ def execute_trade(symbol, decision, price, reason):
             if quantity <= 0:
                 print(f"❌ Trade quantity too small for {symbol}. Skipping trade...")
                 return
-
+                
+            stop_loss_price = round(price * (1 - STOP_LOSS_PERCENT), 2)
+            take_profit_price = round(price * (1 + TAKE_PROFIT_PERCENT), 2)
             time_in_force = "day" if quantity < 1 else "gtc"
 
             # ✅ Execute buy order safely
@@ -289,8 +291,11 @@ def execute_trade(symbol, decision, price, reason):
                     side="buy",
                     type="market",
                     time_in_force=time_in_force
+                    order_class="bracket",
+                    stop_loss={"stop_price": stop_loss_price},
+                    take_profit={"limit_price": take_profit_price}
                 )
-                print(f"✅ Bought {quantity} of {symbol} at ${price:.2f} (Order Type: {time_in_force})")
+                print(f"✅ Bought {quantity} of {symbol} at ${price:.2f} with Stop-Loss at ${stop_loss_price:.2f} and Take-Profit at ${take_profit_price:.2f}")
                 log_trade(symbol, "BUY", quantity, price, reason)
             except Exception as e:
                 print(f"❌ Error executing BUY trade for {symbol}: {e}")
@@ -310,7 +315,9 @@ def execute_trade(symbol, decision, price, reason):
                     return
 
                 time_in_force = "day" if quantity < 1 else "gtc"
-
+                stop_loss_price = round(price * (1 + STOP_LOSS_PERCENT), 2)  # Stop-loss for a short trade
+                take_profit_price = round(price * (1 - TAKE_PROFIT_PERCENT), 2)  # Take-profit for a short trade
+        
                 try:
                     alpaca.submit_order(
                         symbol=symbol,
@@ -318,8 +325,11 @@ def execute_trade(symbol, decision, price, reason):
                         side="sell",
                         type="market",
                         time_in_force=time_in_force
+                        order_class="bracket",
+                        stop_loss={"stop_price": stop_loss_price},
+                        take_profit={"limit_price": take_profit_price}
                     )
-                    print(f"✅ Sold {quantity} of {symbol} at ${price:.2f} (Order Type: {time_in_force})")
+                    print(f"✅ Sold {available_qty} of {symbol} at ${price:.2f} with Stop-Loss at ${stop_loss_price:.2f} and Take-Profit at ${take_profit_price:.2f}")
                     log_trade(symbol, "SELL", quantity, price, reason)
                 except Exception as e:
                     print(f"❌ Error executing SELL trade for {symbol}: {e}")
