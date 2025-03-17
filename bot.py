@@ -118,6 +118,9 @@ def calculate_rsi(data, window=14):
 # ✅ Calculate Indicators
 def calculate_indicators(stock):
     try:
+        # ✅ ATR Calculation (for dynamic stop-loss & take-profit)
+        stock['ATR'] = stock['High'].rolling(window=14).max() - stock['Low'].rolling(window=14).min()
+        
         # ✅ Calculate RSI
         stock['RSI'] = calculate_rsi(stock)
 
@@ -279,8 +282,10 @@ def execute_trade(symbol, decision, price, reason):
                 print(f"❌ Trade quantity too small for {symbol}. Skipping trade...")
                 return
                 
-            stop_loss_price = round(price * (1 - STOP_LOSS_PERCENT), 2)
-            take_profit_price = round(price * (1 + TAKE_PROFIT_PERCENT), 2)
+            # ✅ ATR-Based Dynamic Stop-Loss & Take-Profit
+            atr_value = stock_data['ATR'].iloc[-1]  # Get latest ATR
+            stop_loss_price = round(price - (atr_value * 1.5), 2)  # 1.5x ATR as stop-loss
+            take_profit_price = round(price + (atr_value * 3), 2)  # 3x ATR as take-profit
             time_in_force = "day" if quantity < 1 else "gtc"
 
             # ✅ Execute buy order safely
@@ -292,10 +297,10 @@ def execute_trade(symbol, decision, price, reason):
                     type="market",
                     time_in_force=time_in_force,
                     order_class="bracket",
-                    stop_loss={"stop_price": stop_loss_price},
+                    trail_percent="2",  # ✅ Trailing Stop-Loss Moves 2% Below Price
                     take_profit={"limit_price": take_profit_price}
                 )
-                print(f"✅ Bought {quantity} of {symbol} at ${price:.2f} with Stop-Loss at ${stop_loss_price:.2f} and Take-Profit at ${take_profit_price:.2f}")
+                print(f"✅ Bought {quantity} of {symbol} at ${price:.2f} with Trailing Stop-Loss of 2% and Take-Profit at ${take_profit_price:.2f}")
                 log_trade(symbol, "BUY", quantity, price, reason)
             except Exception as e:
                 print(f"❌ Error executing BUY trade for {symbol}: {e}")
@@ -315,8 +320,10 @@ def execute_trade(symbol, decision, price, reason):
                     return
 
                 time_in_force = "day" if quantity < 1 else "gtc"
-                stop_loss_price = round(price * (1 + STOP_LOSS_PERCENT), 2)  # Stop-loss for a short trade
-                take_profit_price = round(price * (1 - TAKE_PROFIT_PERCENT), 2)  # Take-profit for a short trade
+                # ✅ ATR-Based Stop-Loss & Take-Profit for Sell Trades
+                atr_value = stock_data['ATR'].iloc[-1]
+                stop_loss_price = round(price + (atr_value * 1.5), 2)  # Wider stop for short trades
+                take_profit_price = round(price - (atr_value * 3), 2)  # 3x ATR for profit
         
                 try:
                     alpaca.submit_order(
