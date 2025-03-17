@@ -290,7 +290,7 @@ def execute_trade(symbol, decision, price, reason):
                     qty=quantity,
                     side="buy",
                     type="market",
-                    time_in_force=time_in_force
+                    time_in_force=time_in_force,
                     order_class="bracket",
                     stop_loss={"stop_price": stop_loss_price},
                     take_profit={"limit_price": take_profit_price}
@@ -324,7 +324,7 @@ def execute_trade(symbol, decision, price, reason):
                         qty=quantity,
                         side="sell",
                         type="market",
-                        time_in_force=time_in_force
+                        time_in_force=time_in_force,
                         order_class="bracket",
                         stop_loss={"stop_price": stop_loss_price},
                         take_profit={"limit_price": take_profit_price}
