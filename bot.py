@@ -41,11 +41,11 @@ def fetch_asset_data(symbol):
         # Attempt fetching intraday data
         stock = yf.download(symbol, period="7d", interval=interval, auto_adjust=True, prepost=True)
 
-        # ✅ Handle Multi-Index Issue
+        # Handle Multi-Index Issue
         if isinstance(stock.columns, pd.MultiIndex):
             stock = stock.xs(symbol, level=1, axis=1)
 
-        # ✅ Debug: Print fetched data
+        # Debug: Print fetched data
         if stock.empty:
             print(f"⚠️ No data for {symbol} using interval {interval}. Trying daily data...")
             stock = yf.download(symbol, period="30d", interval="1d", auto_adjust=True)
@@ -56,11 +56,11 @@ def fetch_asset_data(symbol):
         if stock.empty:
             raise ValueError(f"❌ No valid stock data for {symbol} (empty DataFrame)")
 
-        # ✅ Ensure 'Close' column exists and has valid values
+        # Ensure 'Close' column exists and has valid values
         if 'Close' not in stock.columns:
             raise ValueError(f"❌ 'Close' price missing for {symbol} (columns: {stock.columns.tolist()})")
 
-        # ✅ Debug: Print last few rows of stock data
+        # Debug: Print last few rows of stock data
         print(f"📊 {symbol} data preview:\n{stock[['Close']].tail(3)}")
 
         # Forward-fill missing values and calculate indicators
@@ -71,8 +71,9 @@ def fetch_asset_data(symbol):
     except Exception as e:
         print(f"❌ Error fetching data for {symbol}: {e}")
         return None
-
+        
 # ✅ Improved Crypto Data Retrieval
+
 def fetch_crypto_data(symbol):
     yahoo_symbol_map = {
         "BTC-USD": "BTC-USD",
@@ -81,17 +82,17 @@ def fetch_crypto_data(symbol):
     yahoo_symbol = yahoo_symbol_map.get(symbol, symbol)  # Ensure correct symbol format
 
     try:
-        # ✅ Fetch last 30 days of daily data (instead of 7 days with 1-hour intervals)
+        # Fetch last 30 days of daily data (instead of 7 days with 1-hour intervals)
         crypto_data = yf.download(yahoo_symbol, period="30d", interval="1d", auto_adjust=True, prepost=True)
 
-        # ✅ Properly check if data is empty
+        # Properly check if data is empty
         if crypto_data.empty:
             raise ValueError(f"❌ No valid crypto data for {symbol}")
 
-        # ✅ Debug: Print the fetched data
+        # Debug: Print the fetched data
         print(f"📊 {symbol} data preview:\n{crypto_data.tail()}")
 
-        # ✅ Forward-fill missing values and drop remaining NaN rows
+        # Forward-fill missing values and drop remaining NaN rows
         crypto_data = crypto_data.ffill().dropna()
 
         return calculate_indicators(crypto_data)
@@ -121,36 +122,36 @@ def calculate_rsi(data, window=14):
 # ✅ Calculate Indicators
 def calculate_indicators(stock):
     try:
-        # ✅ ATR Calculation (for dynamic stop-loss & take-profit)
+        # ATR Calculation (for dynamic stop-loss & take-profit)
         stock['ATR'] = stock['High'].rolling(window=14).max() - stock['Low'].rolling(window=14).min()
-        
-        # ✅ Calculate RSI
+
+        # Calculate RSI
         stock['RSI'] = calculate_rsi(stock)
 
-        # ✅ Moving Averages
+        # Moving Averages
         stock['SMA_50'] = stock['Close'].rolling(window=50).mean()
         stock['SMA_200'] = stock['Close'].rolling(window=200).mean()
 
-        # ✅ Exponential Moving Averages (EMA)
+        # Exponential Moving Averages (EMA)
         stock['EMA_9'] = stock['Close'].ewm(span=9, adjust=False).mean()
         stock['EMA_21'] = stock['Close'].ewm(span=21, adjust=False).mean()
 
-        # ✅ MACD Indicator
+        # MACD Indicator
         exp12 = stock['Close'].ewm(span=12, adjust=False).mean()
         exp26 = stock['Close'].ewm(span=26, adjust=False).mean()
         stock['MACD'] = exp12 - exp26
         stock['MACD_Signal'] = stock['MACD'].ewm(span=9, adjust=False).mean()
 
-        # ✅ Bollinger Bands
+        # Bollinger Bands
         stock['Middle_Band'] = stock['Close'].rolling(window=20).mean()
         stock['Std_Dev'] = stock['Close'].rolling(window=20).std()
         stock['Upper_Band'] = stock['Middle_Band'] + (stock['Std_Dev'] * 2)
         stock['Lower_Band'] = stock['Middle_Band'] - (stock['Std_Dev'] * 2)
 
-        # ✅ VWAP Calculation
+        # VWAP Calculation
         stock['VWAP'] = (stock['Close'] * stock['Volume']).cumsum() / stock['Volume'].cumsum()
 
-        # ✅ Ensure no NaNs are present
+        # Ensure no NaNs are present
         return stock.fillna(0)
 
     except Exception as e:
@@ -190,28 +191,28 @@ def analyze_with_chatgpt(data):
     """
 
     try:
-        # ✅ Create a new thread for conversation
+        # Create a new thread for conversation
         thread = client.beta.threads.create()
 
-        # ✅ Add user message to the thread
+        # Add user message to the thread
         client.beta.threads.messages.create(
             thread_id=thread.id,
             role="user",
             content=prompt
         )
 
-        # ✅ Run the assistant on that thread
+        # Run the assistant on that thread
         run = client.beta.threads.runs.create(
             thread_id=thread.id,
             assistant_id=ZAPIER_ASSISTANT_ID
         )
 
-        # ✅ Wait for the response to be generated
+        # Wait for the response to be generated
         while run.status in ["queued", "in_progress"]:
             time.sleep(2)  # Wait for processing
             run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
 
-        # ✅ Fetch the response
+        # Fetch the response
         if run.status == "completed":
             messages = client.beta.threads.messages.list(thread_id=thread.id)
             return messages.data[0].content[0].text.value.strip().upper()
