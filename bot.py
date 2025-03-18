@@ -82,7 +82,7 @@ def fetch_crypto_data(symbol):
     yahoo_symbol = yahoo_symbol_map.get(symbol, symbol)  # Ensure correct symbol format
 
     try:
-        # Fetch last 30 days of daily data (instead of 7 days with 1-hour intervals)
+        # Fetch last 30 days of daily data
         crypto_data = yf.download(yahoo_symbol, period="30d", interval="1d", auto_adjust=True, prepost=True)
 
         # Properly check if data is empty
@@ -94,6 +94,9 @@ def fetch_crypto_data(symbol):
 
         # Forward-fill missing values and drop remaining NaN rows
         crypto_data = crypto_data.ffill().dropna()
+
+        # Debug: Print data after forward-fill
+        print(f"📊 {symbol} data after forward-fill:\n{crypto_data.tail()}")
 
         return calculate_indicators(crypto_data)
 
@@ -122,6 +125,10 @@ def calculate_rsi(data, window=14):
 # ✅ Calculate Indicators
 def calculate_indicators(stock):
     try:
+        # Ensure there are enough data points for calculations
+        if len(stock) < 200:
+            raise ValueError(f"Not enough data points to calculate indicators. Data length: {len(stock)}")
+
         # ATR Calculation (for dynamic stop-loss & take-profit)
         stock['ATR'] = stock['High'].rolling(window=14).max() - stock['Low'].rolling(window=14).min()
 
@@ -152,11 +159,17 @@ def calculate_indicators(stock):
         stock['VWAP'] = (stock['Close'] * stock['Volume']).cumsum() / stock['Volume'].cumsum()
 
         # Ensure no NaNs are present
-        return stock.fillna(0)
+        stock = stock.fillna(0)
+
+        # Debug: Print calculated indicators
+        print(f"📊 Calculated indicators for {stock.tail(1).index[0]}:\n{stock.tail(1)}")
+
+        return stock
 
     except Exception as e:
         print(f"❌ Error calculating indicators: {e}")
         return None
+
         
 # ✅ Query ChatGPT for Trade Decisions
 def analyze_with_chatgpt(data):
