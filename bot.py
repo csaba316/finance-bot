@@ -88,6 +88,9 @@ def fetch_crypto_data(symbol):
         if crypto_data.empty:
             raise ValueError(f"❌ No valid crypto data for {symbol}")
 
+        # ✅ Debug: Print the fetched data
+        print(f"📊 {symbol} data preview:\n{crypto_data.tail()}")
+
         # ✅ Forward-fill missing values and drop remaining NaN rows
         crypto_data = crypto_data.ffill().dropna()
 
@@ -153,7 +156,7 @@ def calculate_indicators(stock):
     except Exception as e:
         print(f"❌ Error calculating indicators: {e}")
         return None
-
+        
 # ✅ Query ChatGPT for Trade Decisions
 def analyze_with_chatgpt(data):
     if not data or all(value == 0 or np.isnan(value) for value in data.values()):
