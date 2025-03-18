@@ -81,8 +81,8 @@ def fetch_crypto_data(symbol):
     yahoo_symbol = yahoo_symbol_map.get(symbol, symbol)  # Ensure correct symbol format
 
     try:
-        # ✅ Fetch last 7 days of data with 1-hour intervals
-        crypto_data = yf.download(yahoo_symbol, period="7d", interval="1h", auto_adjust=True, prepost=True)
+        # ✅ Fetch last 30 days of daily data (instead of 7 days with 1-hour intervals)
+        crypto_data = yf.download(yahoo_symbol, period="30d", interval="1d", auto_adjust=True, prepost=True)
 
         # ✅ Properly check if data is empty
         if crypto_data.empty:
