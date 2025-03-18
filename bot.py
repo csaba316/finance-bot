@@ -399,6 +399,7 @@ def main():
                     continue
 
             latest_data = price_data.iloc[-1].to_dict()
+            print(f"📈 Latest data for {asset}: {latest_data}")
             trade_decision = analyze_with_chatgpt(latest_data)
             print(f"📈 {asset} Decision: {trade_decision}")
 
