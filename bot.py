@@ -428,8 +428,8 @@ def main():
 
             execute_trade(asset, decision, price, reason)
 
-        print("⏳ Waiting 5 minutes before next check...")
-        time.sleep(300)
+        print("⏳ Waiting 60 minutes before next check...")
+        time.sleep(3600)
         
 if __name__ == "__main__":
     main()
